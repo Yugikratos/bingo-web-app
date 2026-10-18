@@ -214,3 +214,44 @@ export function playShuffleSound() {
     // Graceful fallback
   }
 }
+
+/**
+ * 6. playRomanticChime: Warm crystalline music-box harp arpeggio for Date Night
+ */
+export function playRomanticChime() {
+  if (isMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const notes = [
+      { freq: 739.99, time: 0 },    // F#5
+      { freq: 932.33, time: 0.1 },  // A#5
+      { freq: 1108.73, time: 0.2 }, // C#6
+      { freq: 1396.91, time: 0.32 } // F6
+    ];
+
+    const startTime = ctx.currentTime + 0.02;
+
+    notes.forEach((note, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const noteTime = startTime + note.time;
+      const duration = 0.55;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq, noteTime);
+
+      gain.gain.setValueAtTime(0.25, noteTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, noteTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(noteTime);
+      osc.stop(noteTime + duration);
+    });
+  } catch (err) {
+    // Graceful fallback
+  }
+}

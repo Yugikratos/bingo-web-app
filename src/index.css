@@ -13,6 +13,8 @@
   --emerald-dark: #059669;
   --gold-primary: #FBBF24;
   --gold-dark: #D97706;
+  --rose-primary: #F43F5E;
+  --rose-dark: #BE123C;
   --slate-tile: rgba(30, 41, 59, 0.85);
   --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", -apple-system, system-ui, sans-serif;
 }
@@ -70,6 +72,7 @@ html, body {
   border-radius: 50%;
   filter: blur(40px);
   animation: pulseIndigo 8s ease-in-out infinite alternate;
+  transition: background 0.8s ease;
 }
 
 .glow-orb-bottom-right {
@@ -84,6 +87,7 @@ html, body {
   border-radius: 50%;
   filter: blur(40px);
   animation: pulseEmerald 8s ease-in-out infinite alternate;
+  transition: background 0.8s ease;
 }
 
 @keyframes pulseIndigo {
@@ -103,6 +107,7 @@ html, body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .glass-card {
@@ -112,6 +117,7 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .glass-button {
@@ -140,10 +146,10 @@ html, body {
   aspect-ratio: 1 / 1;
 }
 
-@media (max-height: 700px) {
+@media (max-height: 720px) {
   .bingo-grid {
     gap: 6px;
-    max-width: 330px;
+    max-width: 325px;
   }
 }
 
@@ -234,8 +240,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 14px;
   font-size: 1.25rem;
   font-weight: 900;
@@ -245,9 +251,9 @@ html, body {
 
 @media (max-width: 375px) {
   .bingo-badge {
-    width: 40px;
-    height: 40px;
-    font-size: 1.1rem;
+    width: 38px;
+    height: 38px;
+    font-size: 1.05rem;
     border-radius: 12px;
   }
 }
@@ -264,6 +270,59 @@ html, body {
   color: #18181B;
   box-shadow: 0 0 18px rgba(251, 191, 36, 0.65), 0 4px 12px rgba(0, 0, 0, 0.35);
   transform: translateY(-2px) scale(1.06);
+}
+
+/* ================================================================= */
+/* DATE NIGHT MODE (YUGI & RENIA) - VELVET ROSE & CHAMPAGNE GOLD     */
+/* ================================================================= */
+.date-night-mode {
+  background-color: #12030C !important;
+}
+
+.date-night-mode .glow-orb-top-left {
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.38) 0%, rgba(244, 63, 94, 0) 70%);
+}
+
+.date-night-mode .glow-orb-bottom-right {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.28) 0%, rgba(251, 191, 36, 0) 70%);
+}
+
+.date-night-mode .glass-card {
+  background: rgba(34, 9, 23, 0.82) !important;
+  border-color: rgba(244, 63, 94, 0.22) !important;
+  box-shadow: 0 20px 45px -10px rgba(20, 2, 12, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.date-night-mode .glass-button {
+  background: rgba(48, 14, 32, 0.8) !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+
+.date-night-mode .glass-button:active {
+  background: rgba(68, 18, 44, 0.85) !important;
+}
+
+.date-night-mode .bingo-tile.called {
+  background: linear-gradient(135deg, #E11D48 0%, #9F1239 100%) !important;
+  border-color: #FB7185 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 16px rgba(225, 29, 72, 0.45) !important;
+}
+
+.date-night-mode .bingo-tile.winning {
+  background: linear-gradient(135deg, #F59E0B 0%, #BE123C 100%) !important;
+  border-color: #FCD34D !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 22px rgba(251, 191, 36, 0.75) !important;
+}
+
+.date-night-mode .last-called-ring {
+  border-color: #F43F5E !important;
+}
+
+.date-night-mode .bingo-badge.active {
+  background: linear-gradient(135deg, #FB7185 0%, #E11D48 60%, #FBBF24 100%) !important;
+  border-color: #FDA4AF !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Custom scrollbars disabled */

@@ -17,7 +17,12 @@ import {
   Sparkles,
   AlertCircle,
   HelpCircle,
-  Award
+  Award,
+  Heart,
+  Flame,
+  RotateCcw,
+  Star,
+  Swords
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove } from './utils/bingoEngine';
 import {
@@ -26,6 +31,7 @@ import {
   playLineCompleteSound,
   playWinFanfare,
   playShuffleSound,
+  playRomanticChime,
   toggleSoundMuted,
   getSoundMuted
 } from './utils/sound';
@@ -33,15 +39,49 @@ import {
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
 
+// Helper to determine wins needed to clinch a series
+function getTargetWins(seriesLength) {
+  if (seriesLength === 1) return 1;
+  if (seriesLength === 3) return 2;
+  if (seriesLength === 5) return 3;
+  if (seriesLength === 7) return 4;
+  if (seriesLength === 10) return 6;
+  return Math.ceil(seriesLength / 2);
+}
+
+const DEFAULT_STATS = {
+  totalSeriesPlayed: 0,
+  localSeriesWon: 0,
+  opponentSeriesWon: 0,
+  totalRoundsPlayed: 0,
+  localRoundsWon: 0,
+  opponentRoundsWon: 0,
+  currentStreak: 0,
+  streakHolder: 'None' // 'local' | 'opponent' | 'None'
+};
+
 export default function App() {
-  // Navigation / Game State Machine: 'lobby' | 'waiting' | 'playing' | 'gameover'
+  // Navigation / Game State Machine: 'lobby' | 'waiting' | 'playing' | 'round_over' | 'series_over'
   const [screen, setScreen] = useState('lobby');
+
+  // Exclusive "Date Night" Mode (Yugi & Renia)
+  const [isDateNight, setIsDateNight] = useState(() => {
+    return localStorage.getItem('bingo_date_night') === 'true';
+  });
+
+  // Best-of Series Match Engine
+  const [seriesLength, setSeriesLength] = useState(3); // 1, 3, 5, 7, 10
+  const [currentRound, setCurrentRound] = useState(1);
+  const [localScore, setLocalScore] = useState(0);
+  const [opponentScore, setOpponentScore] = useState(0);
 
   // Player identity
   const [playerName, setPlayerName] = useState(() => {
-    return localStorage.getItem('bingo_player_name') || `Player #${Math.floor(100 + Math.random() * 900)}`;
+    return localStorage.getItem('bingo_player_name') || 'Yugi';
   });
-  const [opponentName, setOpponentName] = useState('Opponent');
+  const [opponentName, setOpponentName] = useState(() => {
+    return isDateNight ? 'Renia' : 'Opponent';
+  });
 
   // Multiplayer Connection State
   const [role, setRole] = useState('host'); // 'host' | 'guest' | 'solo'
@@ -63,11 +103,23 @@ export default function App() {
   const [firstTurnRole, setFirstTurnRole] = useState('host');
 
   // Winner State
-  const [winnerInfo, setWinnerInfo] = useState(null); // { winner: 'local'|'opponent'|'tie', name: string, reason: string }
+  const [roundWinnerInfo, setRoundWinnerInfo] = useState(null); // { winner: 'local'|'opponent'|'tie', name: string, reason: string }
+  const [seriesWinnerInfo, setSeriesWinnerInfo] = useState(null);
   const [rematchStatus, setRematchStatus] = useState('none'); // 'none' | 'requested' | 'received'
 
   // Progress stats
   const [opponentLinesCount, setOpponentLinesCount] = useState(0);
+
+  // Persistent Head-to-Head Stats
+  const [stats, setStats] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bingo_h2h_stats_v2');
+      return saved ? { ...DEFAULT_STATS, ...JSON.parse(saved) } : DEFAULT_STATS;
+    } catch (e) {
+      return DEFAULT_STATS;
+    }
+  });
+  const [showStatsModal, setShowStatsModal] = useState(false);
 
   // Toast notification state
   const [toastMessage, setToastMessage] = useState(null);
@@ -79,6 +131,21 @@ export default function App() {
 
   // Evaluation of current board
   const { completedLinesCount, winningTileIndices } = evaluateBoard(board, calledNumbers);
+  const targetWins = getTargetWins(seriesLength);
+
+  // Save stats to localStorage
+  const saveStats = useCallback((updatedStats) => {
+    setStats(updatedStats);
+    try {
+      localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updatedStats));
+    } catch (e) {}
+  }, []);
+
+  // Reset persistent stats
+  const handleResetStats = () => {
+    saveStats(DEFAULT_STATS);
+    showToast('Stats reset to zero');
+  };
 
   // Trigger floating iOS Toast
   const showToast = useCallback((msg) => {
@@ -102,6 +169,32 @@ export default function App() {
     showToast(nextMuted ? 'Sound Muted' : 'Sound Enabled');
   };
 
+  // Date Night Mode toggle handler
+  const handleToggleDateNight = () => {
+    const nextVal = !isDateNight;
+    setIsDateNight(nextVal);
+    localStorage.setItem('bingo_date_night', String(nextVal));
+
+    if (nextVal) {
+      if (playerName !== 'Yugi' && playerName !== 'Renia') {
+        handleNameChange('Yugi');
+      }
+      setOpponentName(playerName === 'Yugi' ? 'Renia' : 'Yugi');
+      playRomanticChime();
+      showToast('Date Night Mode Activated! ❤️');
+    } else {
+      showToast('Classic Mode Activated');
+    }
+  };
+
+  // Quick switch between Yugi & Renia
+  const handleSelectPersona = (persona) => {
+    handleNameChange(persona);
+    setOpponentName(persona === 'Yugi' ? 'Renia' : 'Yugi');
+    playRomanticChime();
+    showToast(`Playing as ${persona} 💕`);
+  };
+
   // Inspect URL for auto-join room code on mount
   useEffect(() => {
     try {
@@ -111,9 +204,7 @@ export default function App() {
         setInputCode(urlRoom);
         setIsUrlJoin(true);
       }
-    } catch (e) {
-      // ignore URL parsing error
-    }
+    } catch (e) {}
   }, []);
 
   // Cleanup WebRTC connections on unmount
@@ -129,27 +220,161 @@ export default function App() {
   const prevCompletedLinesRef = useRef(0);
   useEffect(() => {
     if (completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
-      playLineCompleteSound();
+      if (isDateNight) {
+        playRomanticChime();
+      } else {
+        playLineCompleteSound();
+      }
     }
     prevCompletedLinesRef.current = completedLinesCount;
-  }, [completedLinesCount, screen]);
+  }, [completedLinesCount, screen, isDateNight]);
 
-  // Confetti celebration helper
-  const fireVictoryConfetti = () => {
-    confetti({
-      particleCount: 80,
-      spread: 60,
-      origin: { y: 0.65 }
-    });
-    setTimeout(() => {
+  // Confetti celebrations
+  const fireVictoryConfetti = useCallback(() => {
+    if (isDateNight) {
+      // Romantic Heart & Rose Confetti
+      let heartShape = null;
+      try {
+        if (typeof confetti.shapeFromPath === 'function') {
+          heartShape = confetti.shapeFromPath({
+            path: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
+          });
+        }
+      } catch (e) {}
+
+      const shapes = heartShape ? [heartShape, 'circle'] : ['circle'];
+      const colors = ['#F43F5E', '#E11D48', '#BE123C', '#FBBF24', '#FDA4AF', '#FFF1F2'];
+
       confetti({
-        particleCount: 120,
-        spread: 90,
-        origin: { y: 0.55 },
-        colors: ['#FBBF24', '#10B981', '#6366F1', '#EC4899']
+        particleCount: 75,
+        spread: 60,
+        origin: { y: 0.6 },
+        shapes,
+        colors,
+        scalar: 1.3
       });
-    }, 300);
-  };
+
+      setTimeout(() => {
+        confetti({
+          particleCount: 110,
+          spread: 85,
+          origin: { y: 0.5 },
+          shapes,
+          colors,
+          scalar: 1.4
+        });
+      }, 260);
+    } else {
+      // Classic Gold & Emerald Confetti
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.65 }
+      });
+      setTimeout(() => {
+        confetti({
+          particleCount: 120,
+          spread: 90,
+          origin: { y: 0.55 },
+          colors: ['#FBBF24', '#10B981', '#6366F1', '#EC4899']
+        });
+      }, 300);
+    }
+  }, [isDateNight]);
+
+  // Record a round win and evaluate series outcome
+  const recordRoundResult = useCallback(
+    (winnerRole, winnerDisplay) => {
+      let nextLocalScore = localScore;
+      let nextOpponentScore = opponentScore;
+
+      if (winnerRole === 'local') {
+        nextLocalScore += 1;
+        setLocalScore(nextLocalScore);
+      } else if (winnerRole === 'opponent') {
+        nextOpponentScore += 1;
+        setOpponentScore(nextOpponentScore);
+      }
+
+      // Update rounds in persistent stats
+      setStats((prev) => {
+        const updated = {
+          ...prev,
+          totalRoundsPlayed: prev.totalRoundsPlayed + 1,
+          localRoundsWon: winnerRole === 'local' ? prev.localRoundsWon + 1 : prev.localRoundsWon,
+          opponentRoundsWon: winnerRole === 'opponent' ? prev.opponentRoundsWon + 1 : prev.opponentRoundsWon
+        };
+        try {
+          localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      // Check for Series Win
+      const localClenched = nextLocalScore >= targetWins;
+      const opponentClenched = nextOpponentScore >= targetWins;
+
+      if (localClenched || opponentClenched) {
+        const seriesWinner = localClenched ? 'local' : 'opponent';
+        const seriesWinnerName = localClenched ? playerName : opponentName;
+
+        setSeriesWinnerInfo({
+          winner: seriesWinner,
+          name: seriesWinnerName,
+          finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
+          reason: isDateNight
+            ? `${seriesWinnerName} is the Date Night Series Champion! 🥂🌹`
+            : `${seriesWinnerName} won the Best of ${seriesLength} Series!`
+        });
+
+        // Update series in persistent stats
+        setStats((prev) => {
+          const isWinnerLocal = seriesWinner === 'local';
+          const newStreak =
+            prev.streakHolder === seriesWinner ? prev.currentStreak + 1 : 1;
+          const updated = {
+            ...prev,
+            totalSeriesPlayed: prev.totalSeriesPlayed + 1,
+            localSeriesWon: isWinnerLocal ? prev.localSeriesWon + 1 : prev.localSeriesWon,
+            opponentSeriesWon: !isWinnerLocal ? prev.opponentSeriesWon + 1 : prev.opponentSeriesWon,
+            currentStreak: newStreak,
+            streakHolder: seriesWinner
+          };
+          try {
+            localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+
+        setScreen('series_over');
+        playWinFanfare();
+        fireVictoryConfetti();
+      } else {
+        // Round concluded, series continues
+        setRoundWinnerInfo({
+          winner: winnerRole,
+          name: winnerDisplay,
+          localScore: nextLocalScore,
+          opponentScore: nextOpponentScore,
+          roundNum: currentRound
+        });
+        setScreen('round_over');
+        playWinFanfare();
+        fireVictoryConfetti();
+      }
+    },
+    [
+      localScore,
+      opponentScore,
+      targetWins,
+      currentRound,
+      playerName,
+      opponentName,
+      isDateNight,
+      seriesLength,
+      fireVictoryConfetti
+    ]
+  );
 
   // Setup Peer message handlers
   const attachDataHandler = (conn) => {
@@ -159,25 +384,38 @@ export default function App() {
       switch (data.type) {
         case 'HELLO': {
           setOpponentName(data.name || 'Opponent');
-          // Host replies with HELLO_ACK
+          if (data.isDateNight) {
+            setIsDateNight(true);
+          }
+          // Host replies with HELLO_ACK syncing series settings
           conn.send({
             type: 'HELLO_ACK',
             name: playerName,
-            turn: 'host'
+            turn: 'host',
+            seriesLength,
+            isDateNight
           });
           setScreen('playing');
           setRole('host');
           setTurn('host');
           setFirstTurnRole('host');
-          showToast(`${data.name || 'Friend'} joined! Game started!`);
+          setLocalScore(0);
+          setOpponentScore(0);
+          setCurrentRound(1);
+          showToast(`${data.name || 'Friend'} joined! Series: Best of ${seriesLength}`);
           break;
         }
 
         case 'HELLO_ACK': {
           setOpponentName(data.name || 'Opponent');
+          if (data.seriesLength) setSeriesLength(data.seriesLength);
+          if (typeof data.isDateNight === 'boolean') setIsDateNight(data.isDateNight);
           setScreen('playing');
           setTurn(data.turn || 'host');
           setFirstTurnRole(data.turn || 'host');
+          setLocalScore(0);
+          setOpponentScore(0);
+          setCurrentRound(1);
           showToast(`Connected with ${data.name || 'Friend'}!`);
           break;
         }
@@ -204,39 +442,20 @@ export default function App() {
             // Check for simultaneous win
             if (data.isClaimingWin && localEval.completedLinesCount >= 5) {
               // Both reached 5 lines simultaneously!
-              setWinnerInfo({
-                winner: 'tie',
-                name: 'Both Players',
-                reason: 'Simultaneous B-I-N-G-O! It is a Tie!'
-              });
-              setScreen('gameover');
-              playWinFanfare();
-              fireVictoryConfetti();
+              recordRoundResult('tie', 'Both Players');
               conn.send({ type: 'CLAIM_TIE' });
               return updated;
             }
 
             if (data.isClaimingWin) {
-              // Opponent won
-              setWinnerInfo({
-                winner: 'opponent',
-                name: data.senderName || opponentName,
-                reason: `${data.senderName || opponentName} achieved B-I-N-G-O!`
-              });
-              setScreen('gameover');
+              // Opponent won the round
+              recordRoundResult('opponent', data.senderName || opponentName);
               return updated;
             }
 
             if (localEval.completedLinesCount >= 5) {
               // Calling this number caused local player to win!
-              setWinnerInfo({
-                winner: 'local',
-                name: playerName,
-                reason: 'You achieved B-I-N-G-O!'
-              });
-              setScreen('gameover');
-              playWinFanfare();
-              fireVictoryConfetti();
+              recordRoundResult('local', playerName);
               conn.send({
                 type: 'CLAIM_WIN',
                 winnerName: playerName,
@@ -257,36 +476,30 @@ export default function App() {
         }
 
         case 'CLAIM_WIN': {
-          setWinnerInfo({
-            winner: 'opponent',
-            name: data.winnerName || opponentName,
-            reason: `${data.winnerName || opponentName} achieved 5 lines!`
-          });
-          setScreen('gameover');
+          recordRoundResult('opponent', data.winnerName || opponentName);
           break;
         }
 
         case 'CLAIM_TIE': {
-          setWinnerInfo({
-            winner: 'tie',
-            name: 'Both Players',
-            reason: 'Simultaneous B-I-N-G-O! It is a Tie!'
-          });
-          setScreen('gameover');
-          playWinFanfare();
-          fireVictoryConfetti();
+          recordRoundResult('tie', 'Both Players');
           break;
         }
 
-        case 'REMATCH_REQUEST': {
+        case 'NEXT_ROUND': {
+          startNextRound(data.nextTurn, data.roundNum);
+          showToast(`Round ${data.roundNum} started!`);
+          break;
+        }
+
+        case 'SERIES_REMATCH_REQUEST': {
           setRematchStatus('received');
-          showToast(`${opponentName} wants a rematch!`);
+          showToast(`${opponentName} wants a new series!`);
           break;
         }
 
-        case 'REMATCH_ACCEPT': {
-          startNewRound(data.nextStartingTurn);
-          showToast('Rematch started!');
+        case 'SERIES_REMATCH_ACCEPT': {
+          startNewSeries(data.nextStartingTurn);
+          showToast('New series started!');
           break;
         }
 
@@ -313,16 +526,55 @@ export default function App() {
     });
   };
 
-  // Helper to start fresh round for rematch
-  const startNewRound = (startingTurn) => {
-    const freshBoard = generateBoard();
-    const freshBotBoard = generateBoard();
-    setBoard(freshBoard);
-    setBotBoard(freshBotBoard);
+  // Helper to advance to the next round in the series
+  const startNextRound = (startingTurn, roundNum) => {
+    setBoard(generateBoard());
+    setBotBoard(generateBoard());
     setCalledNumbers([]);
     setLastCalled(null);
-    setWinnerInfo(null);
+    setRoundWinnerInfo(null);
+    setOpponentLinesCount(0);
+    prevCompletedLinesRef.current = 0;
+    setTurn(startingTurn);
+    setFirstTurnRole(startingTurn);
+    setCurrentRound(roundNum || currentRound + 1);
+    setScreen('playing');
+  };
+
+  // Trigger next round (initiator)
+  const handleProceedToNextRound = () => {
+    const nextStart = firstTurnRole === 'host' ? 'guest' : 'host';
+    const nextRoundNum = currentRound + 1;
+
+    if (role === 'solo') {
+      const nextSoloStart = firstTurnRole === 'player' ? 'bot' : 'player';
+      startNextRound(nextSoloStart, nextRoundNum);
+      showToast(`Round ${nextRoundNum} started!`);
+      return;
+    }
+
+    if (connRef.current && connRef.current.open) {
+      connRef.current.send({
+        type: 'NEXT_ROUND',
+        nextTurn: nextStart,
+        roundNum: nextRoundNum
+      });
+    }
+    startNextRound(nextStart, nextRoundNum);
+  };
+
+  // Reset series for rematch
+  const startNewSeries = (startingTurn) => {
+    setBoard(generateBoard());
+    setBotBoard(generateBoard());
+    setCalledNumbers([]);
+    setLastCalled(null);
+    setRoundWinnerInfo(null);
+    setSeriesWinnerInfo(null);
     setRematchStatus('none');
+    setLocalScore(0);
+    setOpponentScore(0);
+    setCurrentRound(1);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
     setTurn(startingTurn);
@@ -361,7 +613,6 @@ export default function App() {
     peer.on('error', (err) => {
       console.error('Peer error:', err);
       if (err.type === 'unavailable-id') {
-        // Room code taken, retry with new code
         handleCreateRoom();
       } else {
         setPeerError(err.message || 'Unable to connect to matchmaking server.');
@@ -398,7 +649,8 @@ export default function App() {
         attachDataHandler(conn);
         conn.send({
           type: 'HELLO',
-          name: playerName
+          name: playerName,
+          isDateNight
         });
       });
 
@@ -420,29 +672,33 @@ export default function App() {
   const handlePlaySolo = () => {
     if (peerRef.current) peerRef.current.destroy();
     setRole('solo');
-    setOpponentName('Smart Bot (AI)');
+    setOpponentName(isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
     setBoard(generateBoard());
     setBotBoard(generateBoard());
     setCalledNumbers([]);
     setLastCalled(null);
-    setWinnerInfo(null);
+    setRoundWinnerInfo(null);
+    setSeriesWinnerInfo(null);
     setRematchStatus('none');
+    setLocalScore(0);
+    setOpponentScore(0);
+    setCurrentRound(1);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
     setTurn('player');
     setFirstTurnRole('player');
     setScreen('playing');
-    showToast('Solo Mode: You go first!');
+    showToast(`Solo Series: Best of ${seriesLength}. You go first!`);
   };
 
-  // Share Invite Link Helper (iOS Web Share API with Clipboard Fallback)
+  // Share Invite Link Helper
   const handleShareInvite = async () => {
     const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Play 1-25 Bingo!',
-          text: `Join my 1-25 Bingo game with code ${roomCode}!`,
+          title: isDateNight ? 'Date Night Bingo with Yugi & Renia ❤️' : 'Play 1-25 Bingo!',
+          text: `Join my Best-of-${seriesLength} Bingo match with code ${roomCode}!`,
           url: inviteUrl
         });
       } catch (err) {
@@ -477,7 +733,7 @@ export default function App() {
     // Check turn
     const isMyTurn = role === 'solo' ? turn === 'player' : turn === role;
     if (!isMyTurn) {
-      showToast("Wait for opponent's turn!");
+      showToast(isDateNight ? "Wait for your darling's turn! 💕" : "Wait for opponent's turn!");
       return;
     }
 
@@ -496,14 +752,7 @@ export default function App() {
     if (role === 'solo') {
       // Solo Bot Mode
       if (hasWon) {
-        setWinnerInfo({
-          winner: 'local',
-          name: playerName,
-          reason: 'You achieved B-I-N-G-O!'
-        });
-        setScreen('gameover');
-        playWinFanfare();
-        fireVictoryConfetti();
+        recordRoundResult('local', playerName);
         return;
       }
 
@@ -512,12 +761,7 @@ export default function App() {
       setOpponentLinesCount(botEval.completedLinesCount);
 
       if (botEval.completedLinesCount >= 5) {
-        setWinnerInfo({
-          winner: 'opponent',
-          name: 'Smart Bot (AI)',
-          reason: 'Smart Bot achieved B-I-N-G-O!'
-        });
-        setScreen('gameover');
+        recordRoundResult('opponent', isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
         return;
       }
 
@@ -541,14 +785,7 @@ export default function App() {
       }
 
       if (hasWon) {
-        setWinnerInfo({
-          winner: 'local',
-          name: playerName,
-          reason: 'You achieved B-I-N-G-O!'
-        });
-        setScreen('gameover');
-        playWinFanfare();
-        fireVictoryConfetti();
+        recordRoundResult('local', playerName);
       }
     }
   };
@@ -575,64 +812,43 @@ export default function App() {
       const playerWon = playerEval.completedLinesCount >= 5;
 
       if (botWon && playerWon) {
-        setWinnerInfo({
-          winner: 'tie',
-          name: 'Both Players',
-          reason: 'Simultaneous B-I-N-G-O! It is a Tie!'
-        });
-        setScreen('gameover');
-        playWinFanfare();
-        fireVictoryConfetti();
+        recordRoundResult('tie', 'Both Players');
       } else if (botWon) {
-        setWinnerInfo({
-          winner: 'opponent',
-          name: 'Smart Bot (AI)',
-          reason: 'Smart Bot achieved 5 lines!'
-        });
-        setScreen('gameover');
+        recordRoundResult('opponent', isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
       } else if (playerWon) {
-        setWinnerInfo({
-          winner: 'local',
-          name: playerName,
-          reason: 'You achieved B-I-N-G-O!'
-        });
-        setScreen('gameover');
-        playWinFanfare();
-        fireVictoryConfetti();
+        recordRoundResult('local', playerName);
       } else {
         setTurn('player');
       }
     }, 650);
 
     return () => clearTimeout(timer);
-  }, [role, screen, turn, botBoard, calledNumbers, board, playerName]);
+  }, [role, screen, turn, botBoard, calledNumbers, board, playerName, isDateNight, recordRoundResult]);
 
-  // Handle Rematch Click
-  const handleRematch = () => {
+  // Handle Series Rematch Click
+  const handleSeriesRematch = () => {
     const nextStart = firstTurnRole === 'host' ? 'guest' : 'host';
 
     if (role === 'solo') {
       const nextSoloStart = firstTurnRole === 'player' ? 'bot' : 'player';
-      startNewRound(nextSoloStart);
-      showToast(nextSoloStart === 'player' ? 'New game! Your turn.' : 'New game! Bot starts.');
+      startNewSeries(nextSoloStart);
+      showToast(nextSoloStart === 'player' ? 'New series! Your turn.' : 'New series! Bot starts.');
       return;
     }
 
     if (rematchStatus === 'received') {
-      // Accept rematch
       if (connRef.current && connRef.current.open) {
         connRef.current.send({
-          type: 'REMATCH_ACCEPT',
+          type: 'SERIES_REMATCH_ACCEPT',
           nextStartingTurn: nextStart
         });
       }
-      startNewRound(nextStart);
+      startNewSeries(nextStart);
     } else {
-      // Request rematch
       setRematchStatus('requested');
       if (connRef.current && connRef.current.open) {
         connRef.current.send({
-          type: 'REMATCH_REQUEST'
+          type: 'SERIES_REMATCH_REQUEST'
         });
       }
       showToast('Rematch request sent to opponent');
@@ -650,18 +866,33 @@ export default function App() {
     }
     setScreen('lobby');
     setConnectionStatus('idle');
-    setWinnerInfo(null);
+    setRoundWinnerInfo(null);
+    setSeriesWinnerInfo(null);
     setRematchStatus('none');
     setCalledNumbers([]);
     setLastCalled(null);
+    setLocalScore(0);
+    setOpponentScore(0);
   };
 
-  // Determine whose turn it is for display
+  // Status banner text with Date Night customization
   const isLocalTurn = role === 'solo' ? turn === 'player' : turn === role;
-  const currentTurnName = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
+  let statusBannerText = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
+
+  if (isDateNight) {
+    if (isLocalTurn) {
+      statusBannerText = `Your turn, my love! ❤️`;
+    } else {
+      statusBannerText = `Waiting for ${opponentName}'s sweet move... 💕`;
+    }
+  }
 
   return (
-    <div className="relative w-full h-full flex flex-col justify-between overflow-hidden bg-[#090A0F] text-[#F8FAFC]">
+    <div
+      className={`relative w-full h-full flex flex-col justify-between overflow-hidden text-[#F8FAFC] transition-colors duration-500 ${
+        isDateNight ? 'date-night-mode bg-[#12030C]' : 'bg-[#090A0F]'
+      }`}
+    >
       {/* Background Ambient Glow Orbs */}
       <div className="ambient-glow-wrapper">
         <div className="glow-orb-top-left" />
@@ -675,9 +906,17 @@ export default function App() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -15, scale: 0.95 }}
-            className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full glass-panel shadow-2xl flex items-center gap-2 border border-white/20 text-sm font-semibold text-white tracking-wide"
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 border text-xs sm:text-sm font-semibold tracking-wide ${
+              isDateNight
+                ? 'border-rose-400/30 text-rose-100 bg-rose-950/80 shadow-rose-950/50'
+                : 'border-white/20 text-white'
+            }`}
           >
-            <Sparkles size={16} className="text-amber-400" />
+            {isDateNight ? (
+              <Heart size={16} className="text-rose-400 fill-rose-400 animate-pulse" />
+            ) : (
+              <Sparkles size={16} className="text-amber-400" />
+            )}
             <span>{toastMessage}</span>
           </motion.div>
         )}
@@ -687,47 +926,187 @@ export default function App() {
       {/* SCREEN 1: LOBBY */}
       {/* ================================================================ */}
       {screen === 'lobby' && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-5 py-6 max-w-md mx-auto">
+        <div className="relative z-10 w-full h-full flex flex-col justify-between px-4 py-4 max-w-md mx-auto overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-indigo-700 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-indigo-500/30">
-                25
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-lg ${
+                  isDateNight
+                    ? 'bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/30'
+                    : 'bg-gradient-to-tr from-indigo-500 to-indigo-700 shadow-indigo-500/30'
+                }`}
+              >
+                {isDateNight ? '❤️' : '25'}
               </div>
               <div>
-                <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1.5">
-                  BINGO <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">PRO</span>
+                <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+                  BINGO{' '}
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                      isDateNight
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                    }`}
+                  >
+                    {isDateNight ? 'DATE NIGHT' : 'SERIES PRO'}
+                  </span>
                 </h1>
-                <p className="text-[11px] font-medium text-slate-400 tracking-wider">ZERO-BACKEND MULTIPLAYER</p>
+                <p className="text-[10px] font-medium text-slate-400 tracking-wider">
+                  {isDateNight ? 'YUGI & RENIA EDITION' : 'ZERO-BACKEND MULTIPLAYER'}
+                </p>
               </div>
             </div>
 
-            <button
-              onClick={handleToggleMute}
-              className="w-10 h-10 rounded-full glass-button flex items-center justify-center text-slate-300"
-              title="Toggle Sound"
-              aria-label="Toggle Sound"
-            >
-              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowStatsModal(true)}
+                className="w-9 h-9 rounded-full glass-button flex items-center justify-center text-amber-300"
+                title="View Head-to-Head Stats"
+              >
+                <Flame size={16} />
+              </button>
+              <button
+                onClick={handleToggleMute}
+                className="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300"
+                title="Toggle Sound"
+              >
+                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+            </div>
           </div>
 
-          {/* Middle Card: Name Input & Modes */}
-          <div className="my-auto space-y-4 py-4">
-            {/* Player Name Pill */}
-            <div className="glass-card p-4 space-y-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Your Nickname
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  maxLength={15}
-                  value={playerName}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-base font-semibold text-white placeholder-slate-500 outline-none transition"
+          {/* Date Night Mode Toggle Pill */}
+          <div className="my-2.5">
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={handleToggleDateNight}
+              className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
+                isDateNight
+                  ? 'bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-amber-950/30 border-rose-500/40 shadow-rose-950/50'
+                  : 'glass-card border-white/10 hover:border-white/20'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 text-left">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    isDateNight ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  <Heart size={16} className={isDateNight ? 'fill-white' : ''} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    Date Night Mode (Yugi & Renia)
+                    {isDateNight && <span className="text-rose-400 text-xs">✨ Active</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Velvet rose theme, champagne gold & sweet banter
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`w-11 h-6 flex items-center rounded-full p-1 duration-300 ${
+                  isDateNight ? 'bg-rose-500 justify-end' : 'bg-slate-700 justify-start'
+                }`}
+              >
+                <motion.div
+                  layout
+                  className="bg-white w-4 h-4 rounded-full shadow-md"
                 />
+              </div>
+            </motion.button>
+          </div>
+
+          {/* Date Night Persona Quick Switcher */}
+          {isDateNight && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-2 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
+            >
+              <span className="text-[11px] font-semibold text-rose-300">Choose Player:</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSelectPersona('Yugi')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    playerName === 'Yugi'
+                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                      : 'bg-slate-800/80 text-slate-300'
+                  }`}
+                >
+                  <span>Yugi</span> 🥂
+                </button>
+                <button
+                  onClick={() => handleSelectPersona('Renia')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    playerName === 'Renia'
+                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                      : 'bg-slate-800/80 text-slate-300'
+                  }`}
+                >
+                  <span>Renia</span> 🌹
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Name Input & Best-of Selector */}
+          <div className="space-y-3">
+            {/* Player Name Card */}
+            <div className="glass-card p-3 space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Your Player Name
+              </label>
+              <input
+                type="text"
+                maxLength={15}
+                value={playerName}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="Enter name"
+                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-sm font-semibold text-white placeholder-slate-500 outline-none transition"
+              />
+            </div>
+
+            {/* Best-of Series Selector */}
+            <div className="glass-card p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <Swords size={12} className="text-amber-400" />
+                  <span>Series Match Length</span>
+                </label>
+                <span className="text-[10px] font-bold text-amber-300">
+                  First to {targetWins} {targetWins === 1 ? 'Win' : 'Wins'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { length: 1, label: 'Single', wins: 1 },
+                  { length: 3, label: 'Best 3', wins: 2 },
+                  { length: 5, label: 'Best 5', wins: 3 },
+                  { length: 7, label: 'Best 7', wins: 4 },
+                  { length: 10, label: 'Best 10', wins: 6 }
+                ].map((item) => {
+                  const isSelected = seriesLength === item.length;
+                  return (
+                    <button
+                      key={item.length}
+                      onClick={() => setSeriesLength(item.length)}
+                      className={`py-2 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
+                        isSelected
+                          ? isDateNight
+                            ? 'bg-rose-500 border-rose-300 text-white font-extrabold shadow-md shadow-rose-500/30'
+                            : 'bg-indigo-600 border-indigo-300 text-white font-extrabold shadow-md shadow-indigo-500/30'
+                          : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] leading-none font-bold">{item.label}</span>
+                      <span className="text-[9px] opacity-75 mt-0.5">{item.wins}W</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -735,20 +1114,28 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleCreateRoom}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold text-base shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 border border-indigo-400/30"
+              className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                isDateNight
+                  ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/25 border-rose-400/30'
+                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 shadow-indigo-500/25 border-indigo-400/30'
+              }`}
             >
-              <Users size={20} />
-              <span>Create 2-Player Room</span>
+              <Users size={18} />
+              <span>Create 2-Player Room (Best of {seriesLength})</span>
             </motion.button>
 
             {/* Join Room Box */}
-            <div className={`glass-card p-4 space-y-3 transition-all ${isUrlJoin ? 'ring-2 ring-indigo-500/80 bg-indigo-950/20' : ''}`}>
+            <div
+              className={`glass-card p-3 space-y-2 transition-all ${
+                isUrlJoin ? 'ring-2 ring-indigo-500/80 bg-indigo-950/20' : ''
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  {isUrlJoin ? "Friend's Invite Link Detected" : "Join Friend's Room"}
+                <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                  {isUrlJoin ? "Friend's Invite Link Ready" : "Join Friend's Room"}
                 </span>
                 {isUrlJoin && (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
                     Ready
                   </span>
                 )}
@@ -762,20 +1149,20 @@ export default function App() {
                   value={inputCode}
                   onChange={(e) => setInputCode(e.target.value.slice(0, 4))}
                   placeholder="4-digit code"
-                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
+                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-center text-base font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
                 />
                 <button
                   onClick={() => handleJoinRoom()}
                   disabled={connectionStatus === 'connecting' || inputCode.length !== 4}
-                  className="px-5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-white font-bold text-sm border border-slate-600/50 transition flex items-center justify-center"
+                  className="px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-xs border border-slate-600/50 transition flex items-center justify-center"
                 >
                   {connectionStatus === 'connecting' ? 'Joining...' : 'Join'}
                 </button>
               </div>
 
               {peerError && (
-                <p className="text-xs text-rose-400 flex items-center gap-1.5 pt-1">
-                  <AlertCircle size={14} />
+                <p className="text-[11px] text-rose-400 flex items-center gap-1 pt-0.5">
+                  <AlertCircle size={12} />
                   <span>{peerError}</span>
                 </p>
               )}
@@ -785,18 +1172,30 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handlePlaySolo}
-              className="w-full py-3.5 rounded-2xl glass-button text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-slate-800/80"
+              className="w-full py-2.5 rounded-2xl glass-button text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 hover:bg-slate-800/80"
             >
-              <Bot size={18} className="text-emerald-400" />
-              <span>Play Solo vs Smart Bot</span>
+              <Bot size={16} className={isDateNight ? 'text-rose-400' : 'text-emerald-400'} />
+              <span>
+                {isDateNight
+                  ? 'Solo Practice vs Renia AI 💕'
+                  : `Play Solo vs Smart Bot (Best of ${seriesLength})`}
+              </span>
             </motion.button>
           </div>
 
-          {/* Footer Info */}
-          <div className="text-center pb-2">
-            <p className="text-[11px] text-slate-400">
-              WebRTC P2P Realtime • Complete 5 lines to Win B-I-N-G-O
-            </p>
+          {/* Footer Info & Quick Stats Pill */}
+          <div className="text-center pt-2">
+            <button
+              onClick={() => setShowStatsModal(true)}
+              className="text-[11px] text-slate-400 hover:text-amber-300 transition flex items-center justify-center gap-1.5 mx-auto"
+            >
+              <Flame size={12} className="text-amber-400" />
+              <span>
+                Lifetime Series: <strong>{stats.localSeriesWon}</strong>W -{' '}
+                <strong>{stats.opponentSeriesWon}</strong>L • Streak: 🔥{' '}
+                <strong>{stats.currentStreak}</strong>
+              </span>
+            </button>
           </div>
         </div>
       )}
@@ -815,24 +1214,45 @@ export default function App() {
               <ArrowLeft size={14} />
               <span>Cancel</span>
             </button>
-            <span className="text-xs font-semibold text-indigo-400 tracking-wider">ROOM HOST</span>
+            <span
+              className={`text-xs font-bold tracking-wider ${
+                isDateNight ? 'text-rose-400' : 'text-indigo-400'
+              }`}
+            >
+              BEST OF {seriesLength}
+            </span>
           </div>
 
           {/* Center Card */}
-          <div className="my-auto text-center space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black text-white tracking-tight">Room Created!</h2>
+          <div className="my-auto text-center space-y-5">
+            <div className="space-y-1.5">
+              <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+                <span>Room Created!</span>
+                {isDateNight && <span>❤️</span>}
+              </h2>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Share this 4-digit code or link with your friend to connect and play.
+                {isDateNight
+                  ? 'Share this code with your sweetheart to start your date night match!'
+                  : 'Share this 4-digit code or link with your friend to connect and play.'}
               </p>
             </div>
 
             {/* Giant Room Code Display */}
-            <div className="glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden border border-indigo-500/40 shadow-2xl shadow-indigo-950/50">
+            <div
+              className={`glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden border shadow-2xl ${
+                isDateNight
+                  ? 'border-rose-500/40 shadow-rose-950/50'
+                  : 'border-indigo-500/40 shadow-indigo-950/50'
+              }`}
+            >
               <div className="text-[11px] uppercase font-bold text-slate-400 tracking-widest mb-1">
                 Room Code
               </div>
-              <div className="text-5xl font-black tracking-widest text-indigo-300 font-mono">
+              <div
+                className={`text-5xl font-black tracking-widest font-mono ${
+                  isDateNight ? 'text-rose-300' : 'text-indigo-300'
+                }`}
+              >
                 {roomCode}
               </div>
             </div>
@@ -842,7 +1262,11 @@ export default function App() {
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={handleShareInvite}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 border border-emerald-400/30"
+                className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                  isDateNight
+                    ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/20 border-rose-400/30'
+                    : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/20 border-emerald-400/30'
+                }`}
               >
                 <Share2 size={18} />
                 <span>Share Invite Link</span>
@@ -853,7 +1277,7 @@ export default function App() {
                   const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
                   copyToClipboard(url);
                 }}
-                className="w-full py-3 rounded-2xl glass-button text-xs font-semibold text-slate-300 flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-2xl glass-button text-xs font-semibold text-slate-300 flex items-center justify-center gap-2"
               >
                 <Copy size={15} />
                 <span>Copy Shareable URL</span>
@@ -861,18 +1285,28 @@ export default function App() {
             </div>
 
             {/* Pulse Waiting Status */}
-            <div className="flex items-center justify-center gap-2 text-xs font-medium text-slate-400 pt-2">
+            <div className="flex items-center justify-center gap-2 text-xs font-medium text-slate-400 pt-1">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    isDateNight ? 'bg-rose-400' : 'bg-emerald-400'
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    isDateNight ? 'bg-rose-500' : 'bg-emerald-500'
+                  }`}
+                />
               </span>
-              <span>Waiting for friend to join...</span>
+              <span>
+                {isDateNight ? 'Waiting for darling to connect...' : 'Waiting for opponent to connect...'}
+              </span>
             </div>
           </div>
 
           <div className="text-center pb-2">
             <p className="text-[11px] text-slate-400">
-              The game will automatically launch when your friend connects.
+              Matches play automatically up to {targetWins} wins!
             </p>
           </div>
         </div>
@@ -881,11 +1315,10 @@ export default function App() {
       {/* ================================================================ */}
       {/* SCREEN 3: GAME ARENA */}
       {/* ================================================================ */}
-      {(screen === 'playing' || screen === 'gameover') && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-4 py-3 max-w-md mx-auto">
-          {/* Top Bar: Opponents & Turn Pill */}
+      {(screen === 'playing' || screen === 'round_over' || screen === 'series_over') && (
+        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-2.5 max-w-md mx-auto">
+          {/* Top Bar: Navigation, Series Indicator, Mute */}
           <div className="w-full flex items-center justify-between pt-1">
-            {/* Left: Leave button */}
             <button
               onClick={handleLeaveToLobby}
               className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
@@ -894,25 +1327,14 @@ export default function App() {
               <ArrowLeft size={16} />
             </button>
 
-            {/* Center: Turn Status Pill */}
-            <motion.div
-              animate={isLocalTurn ? { scale: [1, 1.03, 1] } : {}}
-              transition={{ repeat: Infinity, duration: 2.2 }}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all ${
-                isLocalTurn
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
-                  : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  isLocalTurn ? 'bg-emerald-400 animate-pulse' : 'bg-indigo-400'
-                }`}
-              />
-              <span>{currentTurnName}</span>
-            </motion.div>
+            {/* Series Indicator & Target */}
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full glass-panel text-[11px] font-bold border border-white/10">
+              <Swords size={12} className="text-amber-400" />
+              <span>
+                Round {currentRound} • Best of {seriesLength} (First to {targetWins})
+              </span>
+            </div>
 
-            {/* Right: Sound toggle */}
             <button
               onClick={handleToggleMute}
               className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
@@ -922,24 +1344,95 @@ export default function App() {
             </button>
           </div>
 
-          {/* Players Badge & Opponent Progress */}
-          <div className="flex items-center justify-between px-2 py-1 text-xs">
+          {/* Series Head-to-Head Scoreboard Card */}
+          <div
+            className={`w-full py-1.5 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
+              isDateNight
+                ? 'bg-rose-950/40 border-rose-500/30'
+                : 'bg-slate-900/60 border-slate-700/50'
+            }`}
+          >
+            {/* Player 1 (Local) */}
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="font-bold text-slate-200">{playerName}</span>
-              <span className="text-[10px] text-slate-400">(You)</span>
+              {isDateNight ? (
+                <Heart size={14} className="text-rose-400 fill-rose-400" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              )}
+              <span className="font-bold text-xs text-white max-w-[90px] truncate">
+                {playerName}
+              </span>
+              <span
+                className={`text-sm font-black px-2 py-0.5 rounded-lg ${
+                  isDateNight ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'
+                }`}
+              >
+                {localScore}
+              </span>
             </div>
 
+            <div className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+              VS
+            </div>
+
+            {/* Player 2 (Opponent) */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400">
-                {role === 'solo' ? 'Bot' : opponentName}: {opponentLinesCount}/5
+              <span
+                className={`text-sm font-black px-2 py-0.5 rounded-lg ${
+                  isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
+                }`}
+              >
+                {opponentScore}
               </span>
-              <div className="flex gap-1">
+              <span className="font-bold text-xs text-slate-300 max-w-[90px] truncate">
+                {opponentName}
+              </span>
+              {isDateNight ? (
+                <Heart size={14} className="text-amber-400 fill-amber-400" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+              )}
+            </div>
+          </div>
+
+          {/* Turn Status Pill Banner */}
+          <div className="flex items-center justify-between px-1">
+            <motion.div
+              animate={isLocalTurn ? { scale: [1, 1.02, 1] } : {}}
+              transition={{ repeat: Infinity, duration: 2.2 }}
+              className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border transition-all ${
+                isLocalTurn
+                  ? isDateNight
+                    ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-md shadow-rose-950/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-md shadow-emerald-500/20'
+                  : 'bg-slate-800/60 text-slate-300 border-slate-700/40'
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isLocalTurn
+                    ? isDateNight
+                      ? 'bg-rose-400 animate-pulse'
+                      : 'bg-emerald-400 animate-pulse'
+                    : 'bg-indigo-400'
+                }`}
+              />
+              <span>{statusBannerText}</span>
+            </motion.div>
+
+            {/* Opponent Lines Dots */}
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span>Lines:</span>
+              <div className="flex gap-0.5">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <span
                     key={i}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      i < opponentLinesCount ? 'bg-amber-400' : 'bg-slate-700'
+                      i < opponentLinesCount
+                        ? isDateNight
+                          ? 'bg-rose-400'
+                          : 'bg-amber-400'
+                        : 'bg-slate-700'
                     }`}
                   />
                 ))}
@@ -948,7 +1441,7 @@ export default function App() {
           </div>
 
           {/* B-I-N-G-O Header Badges */}
-          <div className="flex items-center justify-center gap-2.5 my-1">
+          <div className="flex items-center justify-center gap-2 my-0.5">
             {BINGO_LETTERS.map((letter, index) => {
               const isActive = completedLinesCount > index;
               return (
@@ -974,7 +1467,7 @@ export default function App() {
               return (
                 <button
                   key={number}
-                  disabled={isCalled || screen === 'gameover'}
+                  disabled={isCalled || screen !== 'playing'}
                   onClick={() => handleTileClick(number)}
                   className={`bingo-tile ${
                     isWinning ? 'winning' : isCalled ? 'called' : 'uncalled'
@@ -989,24 +1482,24 @@ export default function App() {
           </div>
 
           {/* Pre-Game Shuffle Pill / Move Status */}
-          <div className="flex flex-col items-center justify-center min-h-[44px] my-1">
+          <div className="flex flex-col items-center justify-center min-h-[40px] my-0.5">
             {calledNumbers.length === 0 ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleShuffleBoard}
-                className="px-5 py-2 rounded-full glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center gap-2 shadow-lg hover:bg-slate-800"
+                className="px-4 py-1.5 rounded-full glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center gap-1.5 shadow-lg hover:bg-slate-800"
               >
-                <Shuffle size={14} />
+                <Shuffle size={13} />
                 <span>Shuffle My Board</span>
               </motion.button>
             ) : (
-              <div className="flex items-center gap-4 text-xs font-semibold text-slate-400">
+              <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400">
                 <span>
-                  Moves: <strong className="text-white">{calledNumbers.length}</strong> / 25
+                  Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
                 </span>
                 <span>•</span>
                 <span>
-                  Lines: <strong className="text-amber-400">{completedLinesCount}</strong> / 5
+                  Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
                 </span>
                 {lastCalled && (
                   <>
@@ -1023,10 +1516,10 @@ export default function App() {
       )}
 
       {/* ================================================================ */}
-      {/* MODAL: VICTORY / DEFEAT / TIE */}
+      {/* MODAL 1: ROUND OVER (SERIES CONTINUES) */}
       {/* ================================================================ */}
       <AnimatePresence>
-        {screen === 'gameover' && winnerInfo && (
+        {screen === 'round_over' && roundWinnerInfo && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1034,53 +1527,144 @@ export default function App() {
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
           >
             <motion.div
+              initial={{ scale: 0.88, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.88, y: 15 }}
+              className={`glass-card w-full max-w-sm p-5 text-center space-y-4 border shadow-2xl ${
+                isDateNight ? 'border-rose-500/40' : 'border-white/20'
+              }`}
+            >
+              {/* Round Icon */}
+              <div
+                className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white shadow-xl ${
+                  isDateNight
+                    ? 'bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/40'
+                    : 'bg-gradient-to-tr from-amber-400 to-amber-600 shadow-amber-500/30 text-slate-950'
+                }`}
+              >
+                {isDateNight ? (
+                  <Heart size={36} className="fill-white" />
+                ) : (
+                  <Award size={36} strokeWidth={2.2} />
+                )}
+              </div>
+
+              {/* Title & Info */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
+                  Round {roundWinnerInfo.roundNum} Winner
+                </span>
+                <h3 className="text-xl font-black text-white tracking-tight">
+                  {roundWinnerInfo.name} Secured the Round!
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {isDateNight
+                    ? `${roundWinnerInfo.name} completes 5 lines with love! 💕`
+                    : `${roundWinnerInfo.name} completed 5 lines!`}
+                </p>
+              </div>
+
+              {/* Updated Scorecard */}
+              <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-700/60 flex items-center justify-around">
+                <div className="text-center">
+                  <span className="text-[10px] font-bold text-slate-400 block">{playerName}</span>
+                  <span className="text-lg font-black text-white">
+                    {roundWinnerInfo.localScore}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-amber-400">
+                  First to {targetWins}
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] font-bold text-slate-400 block">{opponentName}</span>
+                  <span className="text-lg font-black text-white">
+                    {roundWinnerInfo.opponentScore}
+                  </span>
+                </div>
+              </div>
+
+              {/* Next Round CTA */}
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={handleProceedToNextRound}
+                className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                  isDateNight
+                    ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30'
+                    : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/30 border-indigo-400/30'
+                }`}
+              >
+                <RefreshCw size={16} />
+                <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================ */}
+      {/* MODAL 2: GRAND SERIES CHAMPION */}
+      {/* ================================================================ */}
+      <AnimatePresence>
+        {screen === 'series_over' && seriesWinnerInfo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          >
+            <motion.div
               initial={{ scale: 0.85, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.85, y: 20 }}
-              className="glass-card w-full max-w-sm p-6 text-center space-y-5 border border-white/20 shadow-2xl"
+              className={`glass-card w-full max-w-sm p-6 text-center space-y-5 border shadow-2xl ${
+                isDateNight ? 'border-rose-500/50 shadow-rose-950/60' : 'border-amber-400/30 shadow-amber-950/50'
+              }`}
             >
-              {/* Trophy or Badge Icon */}
-              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 shadow-xl shadow-amber-500/30">
-                {winnerInfo.winner === 'local' ? (
-                  <Trophy size={42} strokeWidth={2.2} />
-                ) : winnerInfo.winner === 'tie' ? (
-                  <Award size={42} strokeWidth={2.2} />
-                ) : (
-                  <Award size={42} strokeWidth={2.2} />
-                )}
+              {/* Grand Trophy Icon */}
+              <div
+                className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center shadow-xl ${
+                  isDateNight
+                    ? 'bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 text-white shadow-rose-500/40'
+                    : 'bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 shadow-amber-500/40'
+                }`}
+              >
+                <Trophy size={42} strokeWidth={2.3} />
               </div>
 
               {/* Title */}
               <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1">
+                  <Star size={12} className="fill-amber-400" />
+                  <span>SERIES CHAMPION</span>
+                  <Star size={12} className="fill-amber-400" />
+                </span>
                 <h3 className="text-2xl font-black text-white tracking-tight">
-                  {winnerInfo.winner === 'local'
-                    ? 'B-I-N-G-O! YOU WON!'
-                    : winnerInfo.winner === 'tie'
-                    ? 'SIMULTANEOUS TIE!'
-                    : `${winnerInfo.name} WON!`}
+                  {seriesWinnerInfo.name} WINS THE SERIES!
                 </h3>
-                <p className="text-xs text-slate-300">{winnerInfo.reason}</p>
+                <p className="text-xs text-slate-300">{seriesWinnerInfo.reason}</p>
               </div>
 
-              {/* Stats Box */}
-              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Your Lines</span>
-                  <span className="text-base font-extrabold text-amber-400">{completedLinesCount} / 5</span>
+              {/* Final Series Scoreboard */}
+              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-xs space-y-1">
+                <div className="text-[10px] uppercase font-bold text-slate-400">
+                  Final Series Score (Best of {seriesLength})
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Calls</span>
-                  <span className="text-base font-extrabold text-white">{calledNumbers.length}</span>
+                <div className="text-2xl font-black text-amber-400 font-mono">
+                  {seriesWinnerInfo.finalScore}
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-1">
                 <motion.button
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleRematch}
+                  onClick={handleSeriesRematch}
                   disabled={rematchStatus === 'requested'}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 border border-indigo-400/30"
+                  className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                    isDateNight
+                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/25 border-rose-400/30'
+                      : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/25 border-indigo-400/30'
+                  }`}
                 >
                   <RefreshCw size={16} />
                   <span>
@@ -1088,15 +1672,114 @@ export default function App() {
                       ? 'Waiting for Opponent...'
                       : rematchStatus === 'received'
                       ? 'Accept Rematch!'
-                      : 'Play Rematch'}
+                      : isDateNight
+                      ? 'Play Another Series, Honey? 💕'
+                      : 'Play Another Series'}
                   </span>
                 </motion.button>
 
                 <button
                   onClick={handleLeaveToLobby}
-                  className="w-full py-3 rounded-2xl glass-button text-xs font-semibold text-slate-300 hover:text-white"
+                  className="w-full py-2.5 rounded-2xl glass-button text-xs font-semibold text-slate-300 hover:text-white"
                 >
                   Back to Lobby
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================ */}
+      {/* MODAL 3: HEAD-TO-HEAD STATS & RIVALRY */}
+      {/* ================================================================ */}
+      <AnimatePresence>
+        {showStatsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="glass-card w-full max-w-sm p-5 space-y-4 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame size={20} className="text-amber-400" />
+                  <h3 className="text-base font-black text-white">
+                    {isDateNight ? 'Yugi vs Renia Rivalry' : 'Head-to-Head Stats'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowStatsModal(false)}
+                  className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg glass-button"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Lifetime Series Record */}
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  Series Record
+                </span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-bold text-white">{playerName}</span>
+                  <span className="text-base font-black text-amber-400">
+                    {stats.localSeriesWon} - {stats.opponentSeriesWon}
+                  </span>
+                  <span className="font-bold text-slate-300">{opponentName}</span>
+                </div>
+              </div>
+
+              {/* Total Rounds Record */}
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Total Rounds Won
+                  </span>
+                  <span className="text-base font-extrabold text-white">
+                    {stats.localRoundsWon}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Opponent Rounds
+                  </span>
+                  <span className="text-base font-extrabold text-slate-300">
+                    {stats.opponentRoundsWon}
+                  </span>
+                </div>
+              </div>
+
+              {/* Current Streak */}
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Current Streak
+                  </span>
+                  <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1">
+                    <Flame size={14} className="text-amber-400" />
+                    <span>
+                      {stats.streakHolder === 'local'
+                        ? `${playerName} (${stats.currentStreak} in a row)`
+                        : stats.streakHolder === 'opponent'
+                        ? `${opponentName} (${stats.currentStreak} in a row)`
+                        : 'No active streak'}
+                    </span>
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleResetStats}
+                  className="px-2.5 py-1.5 rounded-lg glass-button text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                >
+                  <RotateCcw size={12} />
+                  <span>Reset</span>
                 </button>
               </div>
             </motion.div>
