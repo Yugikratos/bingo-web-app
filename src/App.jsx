@@ -23,7 +23,11 @@ import {
   RotateCcw,
   Star,
   Swords,
-  Bell
+  Bell,
+  Camera,
+  Smile,
+  Send,
+  Download
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove } from './utils/bingoEngine';
 import {
@@ -39,6 +43,26 @@ import {
 
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
+
+const WAGER_PRESETS = [
+  '15-Min Massage 💆',
+  'Chooses Tomorrow’s Dinner 🍕',
+  'Breakfast in Bed 🥞',
+  'Buys Morning Coffee ☕',
+  'Does the Dishes Tonight 🧼',
+  'Forehead Kisses on Demand 😘'
+];
+
+const EMOTE_LIST = ['❤️', '😘', '👀', '🔥', '🥺'];
+
+// Safe Haptic Touch Feedback helper
+const triggerHaptic = (pattern = [15]) => {
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch (e) {}
+  }
+};
 
 // Helper to determine wins needed to clinch a series
 function getTargetWins(seriesLength) {
@@ -62,7 +86,7 @@ const DEFAULT_STATS = {
   yugiRoundsWon: 0,
   reniaRoundsWon: 0,
   currentStreak: 0,
-  streakHolder: 'None' // 'Yugi' | 'Renia' | 'None'
+  streakHolder: 'None'
 };
 
 export default function App() {
@@ -73,6 +97,12 @@ export default function App() {
   const [isDateNight, setIsDateNight] = useState(() => {
     return localStorage.getItem('bingo_date_night') === 'true';
   });
+
+  // Date Night Wager / Stakes Selection
+  const [selectedWager, setSelectedWager] = useState(WAGER_PRESETS[0]);
+  const [customWager, setCustomWager] = useState('');
+  const [isCustomWager, setIsCustomWager] = useState(false);
+  const activeWager = isCustomWager && customWager.trim() ? customWager.trim() : selectedWager;
 
   // Best-of Series Match Engine
   const [seriesLength, setSeriesLength] = useState(3); // 1, 3, 5, 7, 10
@@ -110,13 +140,19 @@ export default function App() {
   // Winner State
   const [roundWinnerInfo, setRoundWinnerInfo] = useState(null);
   const [seriesWinnerInfo, setSeriesWinnerInfo] = useState(null);
-  const [rematchStatus, setRematchStatus] = useState('none'); // 'none' | 'requested' | 'received'
+  const [rematchStatus, setRematchStatus] = useState('none');
+
+  // In-Game Floating Emotes (Real-Time Reactions)
+  const [floatingEmotes, setFloatingEmotes] = useState([]); // [{ id, emoji, x }]
+
+  // Date Night Polaroid Modal
+  const [showPolaroidModal, setShowPolaroidModal] = useState(false);
 
   // Progress stats
   const [opponentLinesCount, setOpponentLinesCount] = useState(0);
 
   // Prominent Line Alert Banner (shows when either player claims a line and stays for ~5s)
-  const [lineAlert, setLineAlert] = useState(null); // { title: string, subtitle: string, isOpponent: boolean, count: number }
+  const [lineAlert, setLineAlert] = useState(null);
   const lineAlertTimeoutRef = useRef(null);
 
   // Persistent Head-to-Head Stats
@@ -167,7 +203,7 @@ export default function App() {
     }, 3200);
   }, []);
 
-  // Trigger prominent in-arena Line Alert (stays for 4.8 seconds so both players see it clearly!)
+  // Trigger prominent in-arena Line Alert (stays for 4.8 seconds)
   const triggerLineAlert = useCallback((alertObj) => {
     if (lineAlertTimeoutRef.current) clearTimeout(lineAlertTimeoutRef.current);
     setLineAlert(alertObj);
@@ -175,6 +211,47 @@ export default function App() {
       setLineAlert(null);
     }, 4800);
   }, []);
+
+  // Trigger floating reaction emote across screen
+  const triggerFloatingEmote = useCallback((emoji, xPos = null) => {
+    const id = Date.now() + Math.random();
+    const x =
+      xPos ??
+      Math.floor(
+        Math.random() *
+          (typeof window !== 'undefined' ? window.innerWidth - 80 : 250) +
+          30
+      );
+    setFloatingEmotes((prev) => [...prev.slice(-8), { id, emoji, x }]);
+    setTimeout(() => {
+      setFloatingEmotes((prev) => prev.filter((item) => item.id !== id));
+    }, 2400);
+  }, []);
+
+  // Handle user tapping an in-game love reaction
+  const handleSendEmote = (emoji) => {
+    playTapSound();
+    triggerHaptic([15]);
+    triggerFloatingEmote(emoji);
+
+    if (connRef.current && connRef.current.open) {
+      connRef.current.send({
+        type: 'EMOTE_REACTION',
+        emoji,
+        senderName: playerName
+      });
+    }
+
+    // In Solo practice mode, the AI replies with a cute heart after a natural delay
+    if (role === 'solo') {
+      setTimeout(() => {
+        const botReplies = ['❤️', '😘', '✨', '🥰', '🌹'];
+        const reply = botReplies[Math.floor(Math.random() * botReplies.length)];
+        triggerFloatingEmote(reply);
+        triggerHaptic([20, 30]);
+      }, 700);
+    }
+  };
 
   // Sync player name changes
   const handleNameChange = (newName) => {
@@ -213,6 +290,7 @@ export default function App() {
     const nextOpponent = persona === 'Yugi' ? 'Renia' : 'Yugi';
     setOpponentName(nextOpponent);
     playRomanticChime();
+    triggerHaptic([20]);
     showToast(`Playing as ${persona} 💕`);
   };
 
@@ -238,9 +316,10 @@ export default function App() {
     };
   }, []);
 
-  // Track completed lines to play chime & trigger prominent banner for local player and peer
+  // Track completed lines to play chime & trigger prominent banner
   useEffect(() => {
     if (completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
+      triggerHaptic([30, 45, 30]);
       if (isDateNight) {
         playRomanticChime();
       } else {
@@ -268,7 +347,7 @@ export default function App() {
         count: completedLinesCount
       });
 
-      // Broadcast LINE_COMPLETED packet immediately so the other person gets an alert on their phone
+      // Broadcast LINE_COMPLETED packet immediately so partner's phone rings & shows alert
       if (connRef.current && connRef.current.open) {
         connRef.current.send({
           type: 'LINE_COMPLETED',
@@ -282,6 +361,7 @@ export default function App() {
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
+    triggerHaptic([50, 70, 50, 70, 120]);
     if (isDateNight) {
       let heartShape = null;
       try {
@@ -296,7 +376,7 @@ export default function App() {
       const colors = ['#F43F5E', '#E11D48', '#BE123C', '#FBBF24', '#FDA4AF', '#FFF1F2'];
 
       confetti({
-        particleCount: 75,
+        particleCount: 80,
         spread: 60,
         origin: { y: 0.6 },
         shapes,
@@ -306,8 +386,8 @@ export default function App() {
 
       setTimeout(() => {
         confetti({
-          particleCount: 110,
-          spread: 85,
+          particleCount: 120,
+          spread: 90,
           origin: { y: 0.5 },
           shapes,
           colors,
@@ -360,10 +440,20 @@ export default function App() {
         const updated = {
           ...prev,
           totalRoundsPlayed: (prev.totalRoundsPlayed || 0) + 1,
-          localRoundsWon: winnerRole === 'local' ? (prev.localRoundsWon || 0) + 1 : (prev.localRoundsWon || 0),
-          opponentRoundsWon: winnerRole === 'opponent' ? (prev.opponentRoundsWon || 0) + 1 : (prev.opponentRoundsWon || 0),
-          yugiRoundsWon: winnerIsYugi ? (prev.yugiRoundsWon || 0) + 1 : (prev.yugiRoundsWon || 0),
-          reniaRoundsWon: winnerIsRenia ? (prev.reniaRoundsWon || 0) + 1 : (prev.reniaRoundsWon || 0)
+          localRoundsWon:
+            winnerRole === 'local'
+              ? (prev.localRoundsWon || 0) + 1
+              : prev.localRoundsWon || 0,
+          opponentRoundsWon:
+            winnerRole === 'opponent'
+              ? (prev.opponentRoundsWon || 0) + 1
+              : prev.opponentRoundsWon || 0,
+          yugiRoundsWon: winnerIsYugi
+            ? (prev.yugiRoundsWon || 0) + 1
+            : prev.yugiRoundsWon || 0,
+          reniaRoundsWon: winnerIsRenia
+            ? (prev.reniaRoundsWon || 0) + 1
+            : prev.reniaRoundsWon || 0
         };
         try {
           localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
@@ -389,12 +479,15 @@ export default function App() {
         ];
 
         const romanticSeriesReason =
-          seriesVictoryQuotes[(nextLocalScore + nextOpponentScore) % seriesVictoryQuotes.length];
+          seriesVictoryQuotes[
+            (nextLocalScore + nextOpponentScore) % seriesVictoryQuotes.length
+          ];
 
         setSeriesWinnerInfo({
           winner: seriesWinner,
           name: seriesWinnerName,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
+          wager: activeWager,
           reason: isDateNight
             ? romanticSeriesReason
             : `${seriesWinnerName} won the Best of ${seriesLength} Series!`
@@ -403,19 +496,32 @@ export default function App() {
         // Determine if Yugi or Renia clinched the series for named stats
         const seriesWinnerIsYugi = seriesWinnerName.includes('Yugi');
         const seriesWinnerIsRenia = seriesWinnerName.includes('Renia');
-        const winnerLabel = seriesWinnerIsYugi ? 'Yugi' : seriesWinnerIsRenia ? 'Renia' : seriesWinner;
+        const winnerLabel = seriesWinnerIsYugi
+          ? 'Yugi'
+          : seriesWinnerIsRenia
+          ? 'Renia'
+          : seriesWinner;
 
         // Update series in persistent stats
         setStats((prev) => {
           const isWinnerLocal = seriesWinner === 'local';
-          const newStreak = prev.streakHolder === winnerLabel ? (prev.currentStreak || 0) + 1 : 1;
+          const newStreak =
+            prev.streakHolder === winnerLabel ? (prev.currentStreak || 0) + 1 : 1;
           const updated = {
             ...prev,
             totalSeriesPlayed: (prev.totalSeriesPlayed || 0) + 1,
-            localSeriesWon: isWinnerLocal ? (prev.localSeriesWon || 0) + 1 : (prev.localSeriesWon || 0),
-            opponentSeriesWon: !isWinnerLocal ? (prev.opponentSeriesWon || 0) + 1 : (prev.opponentSeriesWon || 0),
-            yugiSeriesWon: seriesWinnerIsYugi ? (prev.yugiSeriesWon || 0) + 1 : (prev.yugiSeriesWon || 0),
-            reniaSeriesWon: seriesWinnerIsRenia ? (prev.reniaSeriesWon || 0) + 1 : (prev.reniaSeriesWon || 0),
+            localSeriesWon: isWinnerLocal
+              ? (prev.localSeriesWon || 0) + 1
+              : prev.localSeriesWon || 0,
+            opponentSeriesWon: !isWinnerLocal
+              ? (prev.opponentSeriesWon || 0) + 1
+              : prev.opponentSeriesWon || 0,
+            yugiSeriesWon: seriesWinnerIsYugi
+              ? (prev.yugiSeriesWon || 0) + 1
+              : prev.yugiSeriesWon || 0,
+            reniaSeriesWon: seriesWinnerIsRenia
+              ? (prev.reniaSeriesWon || 0) + 1
+              : prev.reniaSeriesWon || 0,
             currentStreak: newStreak,
             streakHolder: winnerLabel
           };
@@ -432,11 +538,11 @@ export default function App() {
         // Round concluded, series continues
         const tieReasons = [
           "It's a tie! Destined minds think alike. 💫",
-          "Simultaneous BINGO! Even our boards are in love. ❤️",
-          "A perfect tie — soulmates can’t even beat each other! 🥂",
-          "Two boards, one heartbeat. It’s a draw! 🕊️",
-          "Neither loses, meaning double the hugs! 🫂",
-          "Cosmic synchronization: 100% matched. 🌌"
+          'Simultaneous BINGO! Even our boards are in love. ❤️',
+          'A perfect tie — soulmates can’t even beat each other! 🥂',
+          'Two boards, one heartbeat. It’s a draw! 🕊️',
+          'Neither loses, meaning double the hugs! 🫂',
+          'Cosmic synchronization: 100% matched. 🌌'
         ];
 
         const roundWinQuotes = [
@@ -477,6 +583,7 @@ export default function App() {
       opponentName,
       isDateNight,
       seriesLength,
+      activeWager,
       fireVictoryConfetti
     ]
   );
@@ -492,12 +599,16 @@ export default function App() {
           if (data.isDateNight) {
             setIsDateNight(true);
           }
+          if (data.wager) {
+            setSelectedWager(data.wager);
+          }
           conn.send({
             type: 'HELLO_ACK',
             name: playerName,
             turn: 'host',
             seriesLength,
-            isDateNight
+            isDateNight,
+            wager: activeWager
           });
           setScreen('playing');
           setRole('host');
@@ -509,7 +620,9 @@ export default function App() {
           prevCompletedLinesRef.current = 0;
           prevOpponentLinesCountRef.current = 0;
           setLineAlert(null);
-          showToast(`${data.name || 'Friend'} joined! Series: Best of ${seriesLength}`);
+          showToast(
+            `${data.name || 'Friend'} joined! Best of ${seriesLength} for ${activeWager}`
+          );
           break;
         }
 
@@ -517,6 +630,7 @@ export default function App() {
           setOpponentName(data.name || 'Opponent');
           if (data.seriesLength) setSeriesLength(data.seriesLength);
           if (typeof data.isDateNight === 'boolean') setIsDateNight(data.isDateNight);
+          if (data.wager) setSelectedWager(data.wager);
           setScreen('playing');
           setTurn(data.turn || 'host');
           setFirstTurnRole(data.turn || 'host');
@@ -526,13 +640,23 @@ export default function App() {
           prevCompletedLinesRef.current = 0;
           prevOpponentLinesCountRef.current = 0;
           setLineAlert(null);
-          showToast(`Connected with ${data.name || 'Friend'}!`);
+          showToast(`Connected with ${data.name || 'Friend'}! 💕`);
+          break;
+        }
+
+        case 'EMOTE_REACTION': {
+          if (data.emoji) {
+            triggerFloatingEmote(data.emoji);
+            triggerHaptic([20, 30]);
+            playTapSound();
+          }
           break;
         }
 
         case 'LINE_COMPLETED': {
           const newCount = data.linesCount || 0;
           if (newCount > prevOpponentLinesCountRef.current) {
+            triggerHaptic([35, 50]);
             if (isDateNight) {
               playRomanticChime();
             } else {
@@ -574,6 +698,7 @@ export default function App() {
           const calledNum = data.number;
           setLastCalled(calledNum);
           playOpponentTapSound();
+          triggerHaptic([10]);
 
           setCalledNumbers((prev) => {
             if (prev.includes(calledNum)) return prev;
@@ -609,7 +734,11 @@ export default function App() {
 
           // Check if opponent completed a new line in this turn
           if (typeof data.linesCount === 'number') {
-            if (data.linesCount > prevOpponentLinesCountRef.current && !data.isClaimingWin) {
+            if (
+              data.linesCount > prevOpponentLinesCountRef.current &&
+              !data.isClaimingWin
+            ) {
+              triggerHaptic([35, 50]);
               if (isDateNight) {
                 playRomanticChime();
               } else {
@@ -738,6 +867,7 @@ export default function App() {
     setLastCalled(null);
     setRoundWinnerInfo(null);
     setSeriesWinnerInfo(null);
+    setShowPolaroidModal(false);
     setRematchStatus('none');
     setLocalScore(0);
     setOpponentScore(0);
@@ -819,7 +949,8 @@ export default function App() {
         conn.send({
           type: 'HELLO',
           name: playerName,
-          isDateNight
+          isDateNight,
+          wager: activeWager
         });
       });
 
@@ -837,12 +968,11 @@ export default function App() {
     });
   };
 
-  // 3. Solo Practice vs Smart Bot Mode Flow (properly swaps AI opponent based on selected player)
+  // 3. Solo Practice vs Smart Bot Mode Flow
   const handlePlaySolo = () => {
     if (peerRef.current) peerRef.current.destroy();
     setRole('solo');
 
-    // If Date Night is active: if player is Renia -> opponent is Yugi (AI). If player is Yugi -> opponent is Renia (AI)
     const soloOpponentName = isDateNight
       ? playerName === 'Renia'
         ? 'Yugi (AI 🥂)'
@@ -856,6 +986,7 @@ export default function App() {
     setLastCalled(null);
     setRoundWinnerInfo(null);
     setSeriesWinnerInfo(null);
+    setShowPolaroidModal(false);
     setRematchStatus('none');
     setLocalScore(0);
     setOpponentScore(0);
@@ -876,8 +1007,10 @@ export default function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: isDateNight ? 'Date Night Bingo with Yugi & Renia ❤️' : 'Play 1-25 Bingo!',
-          text: `Join my Best-of-${seriesLength} Bingo match with code ${roomCode}!`,
+          title: isDateNight
+            ? 'Date Night Bingo with Yugi & Renia ❤️'
+            : 'Play 1-25 Bingo!',
+          text: `Join our Best-of-${seriesLength} Bingo match for "${activeWager}"! Code: ${roomCode}`,
           url: inviteUrl
         });
       } catch (err) {
@@ -897,10 +1030,33 @@ export default function App() {
     );
   };
 
+  // Copy or Share Polaroid Memory Card
+  const handleSharePolaroidMemory = async () => {
+    const memoryText = `📸 Yugi & Renia Date Night Bingo 🌹\n🏆 ${
+      seriesWinnerInfo?.name
+    } won the Series (${seriesWinnerInfo?.finalScore})!\n📜 Official Contract: ${
+      seriesWinnerInfo?.wager || activeWager
+    }\n✨ "Destined minds • Sealed with love 💕"`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Yugi & Renia Date Night Victory Memory Card 📸',
+          text: memoryText
+        });
+      } catch (e) {
+        copyToClipboard(memoryText);
+      }
+    } else {
+      copyToClipboard(memoryText);
+    }
+  };
+
   // Shuffle Board before first move
   const handleShuffleBoard = () => {
     if (calledNumbers.length > 0) return;
     playShuffleSound();
+    triggerHaptic([15, 25]);
     setBoard(generateBoard());
     showToast('Board reshuffled!');
   };
@@ -912,7 +1068,13 @@ export default function App() {
     // Check turn
     const isMyTurn = role === 'solo' ? turn === 'player' : turn === role;
     if (!isMyTurn) {
-      showToast(isDateNight ? "Wait for your darling's turn! 💕" : "Wait for opponent's turn!");
+      showToast(
+        isDateNight
+          ? playerName === 'Yugi'
+            ? "Waiting for your darling Renia's move! 💕"
+            : "Waiting for your handsome Yugi's move! 🥂"
+          : "Wait for opponent's turn!"
+      );
       return;
     }
 
@@ -920,6 +1082,7 @@ export default function App() {
 
     // Process move
     playTapSound();
+    triggerHaptic([12]);
     const nextCalled = [...calledNumbers, number];
     setCalledNumbers(nextCalled);
     setLastCalled(number);
@@ -937,7 +1100,11 @@ export default function App() {
 
       // Check bot lines count
       const botEval = evaluateBoard(botBoard, nextCalled);
-      if (botEval.completedLinesCount > prevOpponentLinesCountRef.current && botEval.completedLinesCount < 5) {
+      if (
+        botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
+        botEval.completedLinesCount < 5
+      ) {
+        triggerHaptic([35, 50]);
         if (isDateNight) {
           playRomanticChime();
         } else {
@@ -1006,6 +1173,7 @@ export default function App() {
     const timer = setTimeout(() => {
       const chosenNum = getBestBotMove(botBoard, calledNumbers);
       playOpponentTapSound();
+      triggerHaptic([12]);
 
       setLastCalled(chosenNum);
       const nextCalled = [...calledNumbers, chosenNum];
@@ -1021,7 +1189,11 @@ export default function App() {
           : 'Renia (AI 💕)'
         : 'Smart Bot (AI)';
 
-      if (botEval.completedLinesCount > prevOpponentLinesCountRef.current && botEval.completedLinesCount < 5) {
+      if (
+        botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
+        botEval.completedLinesCount < 5
+      ) {
+        triggerHaptic([35, 50]);
         if (isDateNight) {
           playRomanticChime();
         } else {
@@ -1078,7 +1250,9 @@ export default function App() {
     if (role === 'solo') {
       const nextSoloStart = firstTurnRole === 'player' ? 'bot' : 'player';
       startNewSeries(nextSoloStart);
-      showToast(nextSoloStart === 'player' ? 'New series! Your turn.' : 'New series! Bot starts.');
+      showToast(
+        nextSoloStart === 'player' ? 'New series! Your turn.' : 'New series! Bot starts.'
+      );
       return;
     }
 
@@ -1114,6 +1288,7 @@ export default function App() {
     setConnectionStatus('idle');
     setRoundWinnerInfo(null);
     setSeriesWinnerInfo(null);
+    setShowPolaroidModal(false);
     setRematchStatus('none');
     setCalledNumbers([]);
     setLastCalled(null);
@@ -1124,7 +1299,7 @@ export default function App() {
     setLineAlert(null);
   };
 
-  // Status banner text with Date Night customization
+  // Status banner text tailored for Yugi and Renia
   const isLocalTurn = role === 'solo' ? turn === 'player' : turn === role;
   let statusBannerText = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
 
@@ -1133,7 +1308,6 @@ export default function App() {
 
     const waitingQuotes = isYugi
       ? [
-          // Yugi is waiting for his girlfriend Renia
           `Waiting for Renia’s sweet move... 💕`,
           `Take your time, beauty... admiring you. 🌹`,
           `Renia is plotting something dangerously cute... 💭`,
@@ -1142,7 +1316,6 @@ export default function App() {
           `Contemplating love or your next number, Renia? 🥰`
         ]
       : [
-          // Renia is waiting for her boyfriend Yugi
           `Waiting for Yugi’s genius move... ✨`,
           `Take your time, handsome... I'm watching you. 😉`,
           `Yugi is overthinking as usual... 💭`,
@@ -1153,7 +1326,6 @@ export default function App() {
 
     const turnQuotes = isYugi
       ? [
-          // It is Yugi's turn
           'Your turn, handsome! Make it count. ❤️',
           'Show Renia how a master plays! 🥂',
           'The board is yours, king! 👑',
@@ -1162,7 +1334,6 @@ export default function App() {
           'Your move, my love! ❤️'
         ]
       : [
-          // It is Renia's turn
           'Your turn, gorgeous! Make it count. ❤️',
           'The board is yours, my queen. 👑',
           'Show Yugi who truly runs this house! 💅',
@@ -1188,6 +1359,21 @@ export default function App() {
       <div className="ambient-glow-wrapper">
         <div className="glow-orb-top-left" />
         <div className="glow-orb-bottom-right" />
+      </div>
+
+      {/* Floating Reaction Emotes */}
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        {floatingEmotes.map((item) => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 1, y: 0, x: item.x, scale: 0.7 }}
+            animate={{ opacity: 0, y: -window.innerHeight * 0.55, scale: 1.5 }}
+            transition={{ duration: 2.2, ease: 'easeOut' }}
+            className="absolute bottom-16 text-3xl filter drop-shadow-lg select-none"
+          >
+            {item.emoji}
+          </motion.div>
+        ))}
       </div>
 
       {/* Floating Toast Notification */}
@@ -1217,7 +1403,7 @@ export default function App() {
       {/* SCREEN 1: LOBBY */}
       {/* ================================================================ */}
       {screen === 'lobby' && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-4 py-4 max-w-md mx-auto overflow-y-auto">
+        <div className="relative z-10 w-full h-full flex flex-col justify-between px-4 py-3.5 max-w-md mx-auto overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
@@ -1268,11 +1454,11 @@ export default function App() {
           </div>
 
           {/* Date Night Mode Toggle Pill */}
-          <div className="my-2">
+          <div className="my-1.5">
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleToggleDateNight}
-              className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
+              className={`w-full p-2.5 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
                 isDateNight
                   ? 'bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-amber-950/30 border-rose-500/40 shadow-rose-950/50'
                   : 'glass-card border-white/10 hover:border-white/20'
@@ -1292,7 +1478,7 @@ export default function App() {
                     {isDateNight && <span className="text-rose-400 text-xs">✨ Active</span>}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Velvet rose theme, champagne gold & sweet banter
+                    Velvet rose surfaces, champagne gold & love banter
                   </div>
                 </div>
               </div>
@@ -1315,7 +1501,7 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-2 p-2 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
+              className="mb-1.5 p-2 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
             >
               <span className="text-[11px] font-semibold text-rose-300">Choose Player:</span>
               <div className="flex gap-2">
@@ -1348,7 +1534,7 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-2.5 p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
+              className="mb-2 p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-300 flex items-center gap-1">
@@ -1410,10 +1596,70 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* Date Night Wager / Stakes Selector */}
+          {isDateNight && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-2 p-2.5 rounded-2xl glass-card border border-rose-500/30 space-y-1.5"
+            >
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1">
+                  <span>💌 Date Night Wager (Loser's Penalty)</span>
+                </label>
+                <span className="text-[9px] text-amber-300 font-bold">Prize at stake</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {WAGER_PRESETS.map((wager) => (
+                  <button
+                    key={wager}
+                    onClick={() => {
+                      setSelectedWager(wager);
+                      setIsCustomWager(false);
+                      triggerHaptic([10]);
+                    }}
+                    className={`px-2 py-0.5 rounded-xl text-[11px] font-semibold transition border ${
+                      selectedWager === wager && !isCustomWager
+                        ? 'bg-rose-500 border-rose-300 text-white font-bold shadow-md shadow-rose-500/30'
+                        : 'bg-slate-900/60 border-slate-700/50 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {wager}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setIsCustomWager(true);
+                    triggerHaptic([10]);
+                  }}
+                  className={`px-2 py-0.5 rounded-xl text-[11px] font-semibold transition border ${
+                    isCustomWager
+                      ? 'bg-rose-500 border-rose-300 text-white font-bold shadow-md shadow-rose-500/30'
+                      : 'bg-slate-900/60 border-slate-700/50 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  ✏️ Custom...
+                </button>
+              </div>
+
+              {isCustomWager && (
+                <input
+                  type="text"
+                  maxLength={35}
+                  value={customWager}
+                  onChange={(e) => setCustomWager(e.target.value)}
+                  placeholder="e.g., Loser cooks dinner tomorrow 🍝"
+                  className="w-full bg-slate-900/60 border border-rose-500/50 rounded-xl px-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none"
+                />
+              )}
+            </motion.div>
+          )}
+
           {/* Name Input & Best-of Selector */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {/* Player Name Card */}
-            <div className="glass-card p-3 space-y-1">
+            <div className="glass-card p-2.5 space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Your Player Name
               </label>
@@ -1428,7 +1674,7 @@ export default function App() {
             </div>
 
             {/* Best-of Series Selector */}
-            <div className="glass-card p-3 space-y-2">
+            <div className="glass-card p-2.5 space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Swords size={12} className="text-amber-400" />
@@ -1451,8 +1697,11 @@ export default function App() {
                   return (
                     <button
                       key={item.length}
-                      onClick={() => setSeriesLength(item.length)}
-                      className={`py-2 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
+                      onClick={() => {
+                        setSeriesLength(item.length);
+                        triggerHaptic([10]);
+                      }}
+                      className={`py-1.5 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
                         isSelected
                           ? isDateNight
                             ? 'bg-rose-500 border-rose-300 text-white font-extrabold shadow-md shadow-rose-500/30'
@@ -1472,7 +1721,7 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleCreateRoom}
-              className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+              className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
                 isDateNight
                   ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/25 border-rose-400/30'
                   : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 shadow-indigo-500/25 border-indigo-400/30'
@@ -1484,7 +1733,7 @@ export default function App() {
 
             {/* Join Room Box */}
             <div
-              className={`glass-card p-3 space-y-2 transition-all ${
+              className={`glass-card p-2.5 space-y-1.5 transition-all ${
                 isUrlJoin ? 'ring-2 ring-indigo-500/80 bg-indigo-950/20' : ''
               }`}
             >
@@ -1507,7 +1756,7 @@ export default function App() {
                   value={inputCode}
                   onChange={(e) => setInputCode(e.target.value.slice(0, 4))}
                   placeholder="4-digit code"
-                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-center text-base font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
+                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-1.5 text-center text-base font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
                 />
                 <button
                   onClick={() => handleJoinRoom()}
@@ -1526,7 +1775,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Solo Practice Button - Properly labels opponent based on selected player */}
+            {/* Solo Practice Button */}
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handlePlaySolo}
@@ -1542,7 +1791,7 @@ export default function App() {
           </div>
 
           {/* Footer Info & Quick Stats Pill */}
-          <div className="text-center pt-2">
+          <div className="text-center pt-1.5">
             <button
               onClick={() => setShowStatsModal(true)}
               className="text-[11px] text-slate-400 hover:text-amber-300 transition flex items-center justify-center gap-1.5 mx-auto"
@@ -1590,7 +1839,7 @@ export default function App() {
               </h2>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
                 {isDateNight
-                  ? 'Share this code with your sweetheart to start your date night match!'
+                  ? `Playing for: "${activeWager}" 💕 Share this code with your sweetheart!`
                   : 'Share this 4-digit code or link with your friend to connect and play.'}
               </p>
             </div>
@@ -1657,7 +1906,9 @@ export default function App() {
                 />
               </span>
               <span>
-                {isDateNight ? 'Waiting for darling to connect...' : 'Waiting for opponent to connect...'}
+                {isDateNight
+                  ? 'Waiting for darling to connect...'
+                  : 'Waiting for opponent to connect...'}
               </span>
             </div>
           </div>
@@ -1674,19 +1925,19 @@ export default function App() {
       {/* SCREEN 3: GAME ARENA */}
       {/* ================================================================ */}
       {(screen === 'playing' || screen === 'round_over' || screen === 'series_over') && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-2 max-w-md mx-auto">
+        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-1.5 max-w-md mx-auto">
           {/* Top Bar: Navigation, Series Indicator, Mute */}
           <div className="w-full flex items-center justify-between pt-1">
             <button
               onClick={handleLeaveToLobby}
-              className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
+              className="p-1.5 rounded-xl glass-button text-slate-400 hover:text-white"
               title="Leave Room"
             >
               <ArrowLeft size={16} />
             </button>
 
             {/* Series Indicator & Target */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full glass-panel text-[11px] font-bold border border-white/10">
+            <div className="flex items-center gap-1 px-3 py-1 rounded-full glass-panel text-[11px] font-bold border border-white/10">
               <Swords size={12} className="text-amber-400" />
               <span>
                 Round {currentRound} • Best of {seriesLength} (First to {targetWins})
@@ -1695,7 +1946,7 @@ export default function App() {
 
             <button
               onClick={handleToggleMute}
-              className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
+              className="p-1.5 rounded-xl glass-button text-slate-400 hover:text-white"
               title="Toggle Sound"
             >
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -1798,7 +2049,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Prominent Line Completion Alert Banner (Visible for 4.8s when either player completes a line) */}
+          {/* Prominent Line Completion Alert Banner (Visible for 4.8s on BOTH screens!) */}
           <AnimatePresence>
             {lineAlert && (
               <motion.div
@@ -1806,7 +2057,7 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -8 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
+                className={`w-full py-1.5 px-3 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
                   lineAlert.count >= 4
                     ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 shadow-amber-950/70 text-amber-100 ring-1 ring-amber-400/50'
                     : lineAlert.isOpponent
@@ -1879,13 +2130,32 @@ export default function App() {
             })}
           </div>
 
+          {/* In-Game Floating Reactions Emote Bar (Date Night) */}
+          {isDateNight && (
+            <div className="flex items-center justify-center gap-2 py-0.5">
+              <span className="text-[10px] font-bold text-rose-300 opacity-75">Send Love:</span>
+              <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel border border-rose-500/30 shadow-md">
+                {EMOTE_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleSendEmote(emoji)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm hover:scale-125 active:scale-95 transition"
+                    title={`Send ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Pre-Game Shuffle Pill / Move Status */}
-          <div className="flex flex-col items-center justify-center min-h-[38px] my-0.5">
+          <div className="flex flex-col items-center justify-center min-h-[34px] my-0.5">
             {calledNumbers.length === 0 ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleShuffleBoard}
-                className="px-4 py-1.5 rounded-full glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center gap-1.5 shadow-lg hover:bg-slate-800"
+                className="px-4 py-1 rounded-full glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center gap-1.5 shadow-lg hover:bg-slate-800"
               >
                 <Shuffle size={13} />
                 <span>Shuffle My Board</span>
@@ -1932,7 +2202,6 @@ export default function App() {
                 isDateNight ? 'border-rose-500/40' : 'border-white/20'
               }`}
             >
-              {/* Round Icon */}
               <div
                 className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white shadow-xl ${
                   isDateNight
@@ -1947,7 +2216,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Title & Info */}
               <div className="space-y-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
                   Round {roundWinnerInfo.roundNum} Winner
@@ -2010,7 +2278,7 @@ export default function App() {
               initial={{ scale: 0.85, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.85, y: 20 }}
-              className={`glass-card w-full max-w-sm p-6 text-center space-y-5 border shadow-2xl ${
+              className={`glass-card w-full max-w-sm p-6 text-center space-y-4 border shadow-2xl ${
                 isDateNight ? 'border-rose-500/50 shadow-rose-950/60' : 'border-amber-400/30 shadow-amber-950/50'
               }`}
             >
@@ -2039,7 +2307,7 @@ export default function App() {
               </div>
 
               {/* Final Series Scoreboard */}
-              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-xs space-y-1">
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700/60 text-xs space-y-1">
                 <div className="text-[10px] uppercase font-bold text-slate-400">
                   Final Series Score (Best of {seriesLength})
                 </div>
@@ -2048,8 +2316,35 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Official Date Night Contract Awarded */}
+              {isDateNight && (
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-950/70 via-rose-950/70 to-amber-950/70 border border-amber-400/50 text-center space-y-1 shadow-lg">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center justify-center gap-1">
+                    <Sparkles size={12} className="text-amber-400" />
+                    <span>Official Date Night Contract Sealed</span>
+                    <Sparkles size={12} className="text-amber-400" />
+                  </div>
+                  <div className="text-xs font-bold text-white">
+                    {seriesWinnerInfo.name} wins:{' '}
+                    <span className="text-amber-400 font-black">
+                      {seriesWinnerInfo.wager || activeWager}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="space-y-2 pt-1">
+                {isDateNight && (
+                  <button
+                    onClick={() => setShowPolaroidModal(true)}
+                    className="w-full py-2.5 rounded-2xl glass-button text-xs font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-2 hover:bg-rose-950/40 shadow-md"
+                  >
+                    <Camera size={15} />
+                    <span>View Date Night Polaroid 📸</span>
+                  </button>
+                )}
+
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSeriesRematch}
@@ -2074,7 +2369,7 @@ export default function App() {
 
                 <button
                   onClick={handleLeaveToLobby}
-                  className="w-full py-2.5 rounded-2xl glass-button text-xs font-semibold text-slate-300 hover:text-white"
+                  className="w-full py-2 rounded-2xl glass-button text-xs font-semibold text-slate-300 hover:text-white"
                 >
                   Back to Lobby
                 </button>
@@ -2178,6 +2473,87 @@ export default function App() {
                 >
                   <RotateCcw size={12} />
                   <span>Reset</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================ */}
+      {/* MODAL 4: DATE NIGHT POLAROID MEMORY CARD */}
+      {/* ================================================================ */}
+      <AnimatePresence>
+        {showPolaroidModal && seriesWinnerInfo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.85, y: 20 }}
+              className="w-full max-w-xs bg-[#FAF7F2] text-slate-900 p-4 pt-5 pb-6 rounded-2xl shadow-2xl space-y-3.5 border-4 border-white/80"
+            >
+              {/* Polaroid Photo Frame */}
+              <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-tr from-rose-950 via-rose-900 to-amber-950 p-4 flex flex-col justify-between items-center text-center relative overflow-hidden border border-rose-500/40 shadow-inner">
+                <div className="w-full flex items-center justify-between text-[10px] font-bold text-rose-300/80 uppercase tracking-widest">
+                  <span>Yugi & Renia</span>
+                  <span>Date Night</span>
+                </div>
+
+                <div className="my-auto space-y-1">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 flex items-center justify-center text-white shadow-lg">
+                    <Trophy size={24} />
+                  </div>
+                  <div className="text-base font-black text-white tracking-tight">
+                    {seriesWinnerInfo.name} Won! 👑
+                  </div>
+                  <div className="text-[11px] text-amber-300 font-bold font-mono">
+                    Series Score: {seriesWinnerInfo.finalScore}
+                  </div>
+                </div>
+
+                <div className="w-full text-[9px] text-rose-200/90 font-medium">
+                  {new Date().toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </div>
+              </div>
+
+              {/* Polaroid Note Content */}
+              <div className="text-center space-y-1 pt-1">
+                <div className="text-xs font-extrabold text-slate-800 flex items-center justify-center gap-1">
+                  <span>Prize:</span>
+                  <span className="text-rose-600 font-black">
+                    {seriesWinnerInfo.wager || activeWager}
+                  </span>
+                </div>
+                <p className="text-[11px] italic text-slate-600">
+                  "Destined minds • Sealed with love 💕"
+                </p>
+              </div>
+
+              {/* Share / Close Buttons */}
+              <div className="space-y-2 pt-1">
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleSharePolaroidMemory}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Share2 size={14} />
+                  <span>Share / Copy Memory</span>
+                </motion.button>
+
+                <button
+                  onClick={() => setShowPolaroidModal(false)}
+                  className="w-full py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs"
+                >
+                  Close
                 </button>
               </div>
             </motion.div>

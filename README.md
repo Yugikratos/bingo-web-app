@@ -70,24 +70,45 @@
 * **One-Tap Romantic Mode Toggle**:
   - Prominent toggle in the lobby with a glowing heart (`❤️`).
   - Allows instant persona selection: **"Yugi 🥂"** or **"Renia 🌹"**.
+  - In Solo Practice mode, dynamically inverts the opponent: playing as Yugi pairs you with **Renia (AI 💕)**; playing as Renia pairs you with **Yugi (AI 🥂)**.
 * **Romantic Theme Overhaul**:
   - Surfaces shift from Obsidian black to deep velvet rose (`#12030C`).
   - Ambient glowing orbs shift to Rose (`#F43F5E`) and Champagne Gold (`#FBBF24`).
   - Called tiles feature deep rose gradients with `#FB7185` neon borders; winning line tiles glow in radiant champagne gold.
   - Heart badges (`❤️` & `💕`) prominently displayed next to player names and scores.
-* **Playful / Romantic Flavor Banners**:
-  - `"Your turn, my love! ❤️"`
-  - `"Waiting for Renia's sweet move... 💕"` / `"Waiting for Yugi's genius move... ✨"`
-  - `"Renia is the Date Night Queen! 👑💖"` / `"Yugi is the Date Night Champion! 🥂🌹"`
+* **Date Night Wager & Stakes Engine**:
+  - Select high-stakes romantic wagers directly in the lobby:
+    - *15-Min Massage 💆*
+    - *Chooses Tomorrow’s Dinner 🍕*
+    - *Breakfast in Bed 🥞*
+    - *Buys Morning Coffee ☕*
+    - *Does the Dishes Tonight 🧼*
+    - *Forehead Kisses on Demand 😘*
+    - *Custom Wager Input* (create your own stakes on the fly!)
+  - The agreed-upon wager is synced over WebRTC and displayed throughout the match and etched into the victory celebration.
+* **Real-Time Floating Love Emote Reactions**:
+  - In-game quick reaction bar with 5 expressive floating emotes: `❤️`, `😘`, `👀`, `🔥`, `🥺`.
+  - Tapping an emote spawns a floating reaction with natural randomized drift and immediately dispatches an `EMOTE_REACTION` packet over WebRTC so it floats up on your partner's screen in real time!
+* **Synchronized 4.8s Line Completion Notification**:
+  - When either player completes a line, a prominent floating banner (`"Yugi claimed a line! ❤️"` or `"Renia claimed a line! 💕"`) stays visible for 4.8 seconds on both devices accompanied by a synchronized romantic harp chime, ensuring neither partner misses when the other is progressing.
+* **Digital Polaroid Victory Memory Card**:
+  - At the end of a Date Night series, players can open a nostalgic, retro **Digital Polaroid Memory Card** commemorating the match.
+  - Displays the victor, winning score, date & time stamp, agreed-upon wager won, and a one-click **"Copy Love Note"** button formatted for iMessage / WhatsApp sharing.
+* **Tactile Haptic Feedback**:
+  - Integrated via `navigator.vibrate` with graceful safety checks for mobile devices.
+  - Provides subtle tactile feedback on tile taps (15ms), harmonic double-pulses on line claims (`[25, 40, 25]`), and celebratory fanfare vibration patterns on victory (`[50, 60, 50, 60, 100]`).
+* **Playful / Romantic Gender-Tailored Flavor Banners**:
+  - When playing as Yugi: *"Waiting for Renia's sweet move... 💕"*, *"Make your lady proud, handsome! ✨"*, *"Renia claimed a line! ❤️"*.
+  - When playing as Renia: *"Waiting for Yugi's genius move... ✨"*, *"Show him how it's done, gorgeous! 💖"*, *"Yugi claimed a line! 🥂"*.
 * **Custom Flying Heart Confetti**:
   - Emits real flying heart particles using SVG heart path geometry with rose, fuchsia, and champagne gold palettes.
 
 ### 3. Persistent Head-to-Head Stats & Leaderboards (`localStorage`)
 * Stored locally under key `bingo_h2h_stats_v2`:
-  - **Total Series Played & Won**: Historical series rivalry between players.
-  - **Total Individual Rounds Won**: Complete cumulative rounds tally.
+  - **Lifetime Yugi vs. Renia Rivalry**: Dedicated series counters for both Yugi and Renia.
+  - **Total Individual Rounds Won**: Cumulative rounds tally across all play sessions.
   - **Active Win Streak & Streak Holder**: Tracks current momentum (`🔥 3 in a row (Yugi)`).
-* Includes a sleek rivalry card in the lobby with an instant "Reset" confirmation.
+* Includes a sleek rivalry card displayed right in the lobby with an instant "Reset" confirmation.
 
 ### 4. Real-Time 12-Line Win Detector (`evaluateBoard`)
 * Continuously evaluates all 12 potential winning lines:
@@ -148,18 +169,26 @@ sequenceDiagram
     participant GuestPeer as Guest Peer
     actor Guest as Guest (Renia)
 
-    Host->>HostPeer: Create Room (Selects Best of 5 & Date Night)
+    Host->>HostPeer: Create Room (Selects Best of 5, Wager, Date Night)
     Guest->>GuestPeer: Enters Code / Follows URL (?room=XXXX)
     GuestPeer->>HostPeer: Connect via WebRTC Data Channel
     GuestPeer->>HostPeer: HELLO { name: 'Renia', isDateNight: true }
-    HostPeer->>GuestPeer: HELLO_ACK { name: 'Yugi', turn: 'host', seriesLength: 5, isDateNight: true }
+    HostPeer->>GuestPeer: HELLO_ACK { name: 'Yugi', turn: 'host', seriesLength: 5, isDateNight: true, wager: '15-Min Massage 💆' }
     Note over Host,Guest: Match Begins (Arena Screen Loaded)
+
+    loop Mid-Match Interactions & Reactions
+        Guest->>GuestPeer: Taps Floating Heart Emote (❤️)
+        GuestPeer->>HostPeer: EMOTE_REACTION { emoji: '❤️', senderName: 'Renia' }
+        Note over Host: Floating heart floats up in real-time
+    end
 
     loop Gameplay Round 1
         Host->>HostPeer: Calls Number (e.g. 17)
-        HostPeer->>GuestPeer: CALL_NUMBER { number: 17, nextTurn: 'guest', linesCount }
+        HostPeer->>GuestPeer: CALL_NUMBER { number: 17, nextTurn: 'guest', linesCount: 1 }
+        HostPeer->>GuestPeer: LINE_COMPLETED { linesCount: 1, senderName: 'Yugi' }
+        Note over Host,Guest: Both devices show 4.8s Banner & play Harp Chime
         Guest->>GuestPeer: Calls Number (e.g. 8)
-        GuestPeer->>HostPeer: CALL_NUMBER { number: 8, nextTurn: 'host', linesCount }
+        GuestPeer->>HostPeer: CALL_NUMBER { number: 8, nextTurn: 'host', linesCount: 1 }
     end
 
     alt Player Completes 5 Lines
@@ -171,12 +200,26 @@ sequenceDiagram
     end
 
     alt Player Reaches Series Quota (3 Wins)
-        Note over Host,Guest: Series Complete! Grand Champion Crowned & Confetti
+        Note over Host,Guest: Series Complete! Polaroid Victory Card Unlocked & Confetti
         HostPeer->>GuestPeer: SERIES_REMATCH_REQUEST {}
         GuestPeer->>HostPeer: SERIES_REMATCH_ACCEPT { nextStartingTurn }
         Note over Host,Guest: Scores Reset 0-0, New Series Begins
     end
 ```
+
+### WebRTC Packet Reference
+| Packet Type | Direction | Payload Attributes | Description |
+| :--- | :--- | :--- | :--- |
+| `HELLO` | Guest $\rightarrow$ Host | `{ name, isDateNight }` | Initiates handshake and transmits guest nickname and theme state. |
+| `HELLO_ACK` | Host $\rightarrow$ Guest | `{ name, turn, seriesLength, isDateNight, wager }` | Confirms connection, transmits host rules, turn order, and active wager. |
+| `CALL_NUMBER` | Peer $\leftrightarrow$ Peer | `{ number, nextTurn, linesCount }` | Broadcasts called number (1–25) and passes active turn. |
+| `LINE_COMPLETED`| Peer $\leftrightarrow$ Peer | `{ linesCount, senderName }` | Triggers synchronized 4.8s prominent banner and romantic chime. |
+| `EMOTE_REACTION`| Peer $\leftrightarrow$ Peer | `{ emoji, senderName }` | Triggers floating physics reaction on partner's screen. |
+| `CLAIM_WIN` | Peer $\leftrightarrow$ Peer | `{ winnerName }` | Broadcasts 5-line round victory and triggers celebration modal. |
+| `CLAIM_TIE` | Peer $\leftrightarrow$ Peer | `{}` | Broadcasts simultaneous mutual 5-line tie. |
+| `NEXT_ROUND` | Host $\rightarrow$ Guest | `{ nextTurn, roundNum }` | Synchronizes board resets and advances series round counter. |
+| `SERIES_REMATCH_REQUEST` | Peer $\leftrightarrow$ Peer | `{}` | Requests reset for a fresh Best-of series. |
+| `SERIES_REMATCH_ACCEPT` | Peer $\leftrightarrow$ Peer | `{ nextStartingTurn }` | Accepts series rematch and resets scores to 0–0. |
 
 ---
 
