@@ -22,7 +22,8 @@ import {
   Flame,
   RotateCcw,
   Star,
-  Swords
+  Swords,
+  Bell
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove } from './utils/bingoEngine';
 import {
@@ -56,8 +57,12 @@ const DEFAULT_STATS = {
   totalRoundsPlayed: 0,
   localRoundsWon: 0,
   opponentRoundsWon: 0,
+  yugiSeriesWon: 0,
+  reniaSeriesWon: 0,
+  yugiRoundsWon: 0,
+  reniaRoundsWon: 0,
   currentStreak: 0,
-  streakHolder: 'None' // 'local' | 'opponent' | 'None'
+  streakHolder: 'None' // 'Yugi' | 'Renia' | 'None'
 };
 
 export default function App() {
@@ -80,7 +85,7 @@ export default function App() {
     return localStorage.getItem('bingo_player_name') || 'Yugi';
   });
   const [opponentName, setOpponentName] = useState(() => {
-    return isDateNight ? 'Renia' : 'Opponent';
+    return isDateNight ? (playerName === 'Renia' ? 'Yugi' : 'Renia') : 'Opponent';
   });
 
   // Multiplayer Connection State
@@ -103,12 +108,16 @@ export default function App() {
   const [firstTurnRole, setFirstTurnRole] = useState('host');
 
   // Winner State
-  const [roundWinnerInfo, setRoundWinnerInfo] = useState(null); // { winner: 'local'|'opponent'|'tie', name: string, reason: string }
+  const [roundWinnerInfo, setRoundWinnerInfo] = useState(null);
   const [seriesWinnerInfo, setSeriesWinnerInfo] = useState(null);
   const [rematchStatus, setRematchStatus] = useState('none'); // 'none' | 'requested' | 'received'
 
   // Progress stats
   const [opponentLinesCount, setOpponentLinesCount] = useState(0);
+
+  // Prominent Line Alert Banner (shows when either player claims a line and stays for ~5s)
+  const [lineAlert, setLineAlert] = useState(null); // { title: string, subtitle: string, isOpponent: boolean, count: number }
+  const lineAlertTimeoutRef = useRef(null);
 
   // Persistent Head-to-Head Stats
   const [stats, setStats] = useState(() => {
@@ -128,6 +137,8 @@ export default function App() {
   // WebRTC refs
   const peerRef = useRef(null);
   const connRef = useRef(null);
+  const prevCompletedLinesRef = useRef(0);
+  const prevOpponentLinesCountRef = useRef(0);
 
   // Evaluation of current board
   const { completedLinesCount, winningTileIndices } = evaluateBoard(board, calledNumbers);
@@ -144,7 +155,7 @@ export default function App() {
   // Reset persistent stats
   const handleResetStats = () => {
     saveStats(DEFAULT_STATS);
-    showToast('Stats reset to zero');
+    showToast('Lifetime stats reset to zero');
   };
 
   // Trigger floating iOS Toast
@@ -153,7 +164,16 @@ export default function App() {
     setToastMessage(msg);
     toastTimeoutRef.current = setTimeout(() => {
       setToastMessage(null);
-    }, 2800);
+    }, 3200);
+  }, []);
+
+  // Trigger prominent in-arena Line Alert (stays for 4.8 seconds so both players see it clearly!)
+  const triggerLineAlert = useCallback((alertObj) => {
+    if (lineAlertTimeoutRef.current) clearTimeout(lineAlertTimeoutRef.current);
+    setLineAlert(alertObj);
+    lineAlertTimeoutRef.current = setTimeout(() => {
+      setLineAlert(null);
+    }, 4800);
   }, []);
 
   // Sync player name changes
@@ -179,7 +199,7 @@ export default function App() {
       if (playerName !== 'Yugi' && playerName !== 'Renia') {
         handleNameChange('Yugi');
       }
-      setOpponentName(playerName === 'Yugi' ? 'Renia' : 'Yugi');
+      setOpponentName(playerName === 'Renia' ? 'Yugi' : 'Renia');
       playRomanticChime();
       showToast('Date Night Mode Activated! ❤️');
     } else {
@@ -190,7 +210,8 @@ export default function App() {
   // Quick switch between Yugi & Renia
   const handleSelectPersona = (persona) => {
     handleNameChange(persona);
-    setOpponentName(persona === 'Yugi' ? 'Renia' : 'Yugi');
+    const nextOpponent = persona === 'Yugi' ? 'Renia' : 'Yugi';
+    setOpponentName(nextOpponent);
     playRomanticChime();
     showToast(`Playing as ${persona} 💕`);
   };
@@ -213,38 +234,55 @@ export default function App() {
       if (connRef.current) connRef.current.close();
       if (peerRef.current) peerRef.current.destroy();
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      if (lineAlertTimeoutRef.current) clearTimeout(lineAlertTimeoutRef.current);
     };
   }, []);
 
-  // Track completed lines to play chime & romantic quotes
-  const prevCompletedLinesRef = useRef(0);
+  // Track completed lines to play chime & trigger prominent banner for local player and peer
   useEffect(() => {
     if (completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
       if (isDateNight) {
         playRomanticChime();
-        if (completedLinesCount === 4) {
-          showToast("4 lines down! ONE AWAY FROM BINGO! Hold your breath! 💓");
-        } else {
-          const lineQuotes = [
-            `${playerName} claimed a line! What a charmer! ❤️`,
-            "One line closer to your heart... 💌",
-            "That line was pure poetry in motion! ✨",
-            `A line for ${playerName}, a smile for us. 🥰`,
-            `${playerName} locked in a line! Unstoppable grace! 💕`
-          ];
-          showToast(lineQuotes[(completedLinesCount - 1) % lineQuotes.length]);
-        }
       } else {
         playLineCompleteSound();
       }
+
+      const title =
+        completedLinesCount === 4
+          ? '🚨 4 LINES DOWN! ONE AWAY FROM BINGO!'
+          : isDateNight
+          ? `❤️ You claimed a line! (${completedLinesCount}/5)`
+          : `✨ You completed a line! (${completedLinesCount}/5)`;
+
+      const subtitle =
+        completedLinesCount === 4
+          ? 'Hold your breath! 1 more line to win! 💓'
+          : isDateNight
+          ? 'One step closer to victory, my love. 💕'
+          : `You have completed ${completedLinesCount} of 5 lines.`;
+
+      triggerLineAlert({
+        title,
+        subtitle,
+        isOpponent: false,
+        count: completedLinesCount
+      });
+
+      // Broadcast LINE_COMPLETED packet immediately so the other person gets an alert on their phone
+      if (connRef.current && connRef.current.open) {
+        connRef.current.send({
+          type: 'LINE_COMPLETED',
+          linesCount: completedLinesCount,
+          senderName: playerName
+        });
+      }
     }
     prevCompletedLinesRef.current = completedLinesCount;
-  }, [completedLinesCount, screen, isDateNight, playerName, showToast]);
+  }, [completedLinesCount, screen, isDateNight, playerName, triggerLineAlert]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
     if (isDateNight) {
-      // Romantic Heart & Rose Confetti
       let heartShape = null;
       try {
         if (typeof confetti.shapeFromPath === 'function') {
@@ -277,7 +315,6 @@ export default function App() {
         });
       }, 260);
     } else {
-      // Classic Gold & Emerald Confetti
       confetti({
         particleCount: 80,
         spread: 60,
@@ -308,13 +345,25 @@ export default function App() {
         setOpponentScore(nextOpponentScore);
       }
 
+      // Identify winner by name for lifetime Yugi vs Renia tally
+      const winnerIsYugi =
+        winnerDisplay.includes('Yugi') ||
+        (winnerRole === 'local' && playerName === 'Yugi') ||
+        (winnerRole === 'opponent' && opponentName.includes('Yugi'));
+      const winnerIsRenia =
+        winnerDisplay.includes('Renia') ||
+        (winnerRole === 'local' && playerName === 'Renia') ||
+        (winnerRole === 'opponent' && opponentName.includes('Renia'));
+
       // Update rounds in persistent stats
       setStats((prev) => {
         const updated = {
           ...prev,
-          totalRoundsPlayed: prev.totalRoundsPlayed + 1,
-          localRoundsWon: winnerRole === 'local' ? prev.localRoundsWon + 1 : prev.localRoundsWon,
-          opponentRoundsWon: winnerRole === 'opponent' ? prev.opponentRoundsWon + 1 : prev.opponentRoundsWon
+          totalRoundsPlayed: (prev.totalRoundsPlayed || 0) + 1,
+          localRoundsWon: winnerRole === 'local' ? (prev.localRoundsWon || 0) + 1 : (prev.localRoundsWon || 0),
+          opponentRoundsWon: winnerRole === 'opponent' ? (prev.opponentRoundsWon || 0) + 1 : (prev.opponentRoundsWon || 0),
+          yugiRoundsWon: winnerIsYugi ? (prev.yugiRoundsWon || 0) + 1 : (prev.yugiRoundsWon || 0),
+          reniaRoundsWon: winnerIsRenia ? (prev.reniaRoundsWon || 0) + 1 : (prev.reniaRoundsWon || 0)
         };
         try {
           localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
@@ -351,18 +400,24 @@ export default function App() {
             : `${seriesWinnerName} won the Best of ${seriesLength} Series!`
         });
 
+        // Determine if Yugi or Renia clinched the series for named stats
+        const seriesWinnerIsYugi = seriesWinnerName.includes('Yugi');
+        const seriesWinnerIsRenia = seriesWinnerName.includes('Renia');
+        const winnerLabel = seriesWinnerIsYugi ? 'Yugi' : seriesWinnerIsRenia ? 'Renia' : seriesWinner;
+
         // Update series in persistent stats
         setStats((prev) => {
           const isWinnerLocal = seriesWinner === 'local';
-          const newStreak =
-            prev.streakHolder === seriesWinner ? prev.currentStreak + 1 : 1;
+          const newStreak = prev.streakHolder === winnerLabel ? (prev.currentStreak || 0) + 1 : 1;
           const updated = {
             ...prev,
-            totalSeriesPlayed: prev.totalSeriesPlayed + 1,
-            localSeriesWon: isWinnerLocal ? prev.localSeriesWon + 1 : prev.localSeriesWon,
-            opponentSeriesWon: !isWinnerLocal ? prev.opponentSeriesWon + 1 : prev.opponentSeriesWon,
+            totalSeriesPlayed: (prev.totalSeriesPlayed || 0) + 1,
+            localSeriesWon: isWinnerLocal ? (prev.localSeriesWon || 0) + 1 : (prev.localSeriesWon || 0),
+            opponentSeriesWon: !isWinnerLocal ? (prev.opponentSeriesWon || 0) + 1 : (prev.opponentSeriesWon || 0),
+            yugiSeriesWon: seriesWinnerIsYugi ? (prev.yugiSeriesWon || 0) + 1 : (prev.yugiSeriesWon || 0),
+            reniaSeriesWon: seriesWinnerIsRenia ? (prev.reniaSeriesWon || 0) + 1 : (prev.reniaSeriesWon || 0),
             currentStreak: newStreak,
-            streakHolder: seriesWinner
+            streakHolder: winnerLabel
           };
           try {
             localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
@@ -437,7 +492,6 @@ export default function App() {
           if (data.isDateNight) {
             setIsDateNight(true);
           }
-          // Host replies with HELLO_ACK syncing series settings
           conn.send({
             type: 'HELLO_ACK',
             name: playerName,
@@ -452,6 +506,9 @@ export default function App() {
           setLocalScore(0);
           setOpponentScore(0);
           setCurrentRound(1);
+          prevCompletedLinesRef.current = 0;
+          prevOpponentLinesCountRef.current = 0;
+          setLineAlert(null);
           showToast(`${data.name || 'Friend'} joined! Series: Best of ${seriesLength}`);
           break;
         }
@@ -466,7 +523,43 @@ export default function App() {
           setLocalScore(0);
           setOpponentScore(0);
           setCurrentRound(1);
+          prevCompletedLinesRef.current = 0;
+          prevOpponentLinesCountRef.current = 0;
+          setLineAlert(null);
           showToast(`Connected with ${data.name || 'Friend'}!`);
+          break;
+        }
+
+        case 'LINE_COMPLETED': {
+          const newCount = data.linesCount || 0;
+          if (newCount > prevOpponentLinesCountRef.current) {
+            if (isDateNight) {
+              playRomanticChime();
+            } else {
+              playLineCompleteSound();
+            }
+
+            const sender = data.senderName || opponentName;
+            const title =
+              newCount === 4
+                ? `🚨 ${sender} HAS 4 LINES!`
+                : `${isDateNight ? '💕' : '✨'} ${sender} completed a line! (${newCount}/5)`;
+
+            const subtitle =
+              newCount === 4
+                ? 'ONE AWAY FROM BINGO! Watch out! 💓'
+                : `${sender} just claimed another line on their board.`;
+
+            triggerLineAlert({
+              title,
+              subtitle,
+              isOpponent: true,
+              count: newCount
+            });
+
+            setOpponentLinesCount(newCount);
+            prevOpponentLinesCountRef.current = newCount;
+          }
           break;
         }
 
@@ -491,20 +584,17 @@ export default function App() {
 
             // Check for simultaneous win
             if (data.isClaimingWin && localEval.completedLinesCount >= 5) {
-              // Both reached 5 lines simultaneously!
               recordRoundResult('tie', 'Both Players');
               conn.send({ type: 'CLAIM_TIE' });
               return updated;
             }
 
             if (data.isClaimingWin) {
-              // Opponent won the round
               recordRoundResult('opponent', data.senderName || opponentName);
               return updated;
             }
 
             if (localEval.completedLinesCount >= 5) {
-              // Calling this number caused local player to win!
               recordRoundResult('local', playerName);
               conn.send({
                 type: 'CLAIM_WIN',
@@ -517,7 +607,32 @@ export default function App() {
             return updated;
           });
 
+          // Check if opponent completed a new line in this turn
           if (typeof data.linesCount === 'number') {
+            if (data.linesCount > prevOpponentLinesCountRef.current && !data.isClaimingWin) {
+              if (isDateNight) {
+                playRomanticChime();
+              } else {
+                playLineCompleteSound();
+              }
+              const sender = data.senderName || opponentName;
+              const title =
+                data.linesCount === 4
+                  ? `🚨 ${sender} HAS 4 LINES!`
+                  : `${isDateNight ? '💕' : '✨'} ${sender} completed a line! (${data.linesCount}/5)`;
+              const subtitle =
+                data.linesCount === 4
+                  ? 'ONE AWAY FROM BINGO! Watch out! 💓'
+                  : `${sender} just claimed another line on their board.`;
+
+              triggerLineAlert({
+                title,
+                subtitle,
+                isOpponent: true,
+                count: data.linesCount
+              });
+            }
+            prevOpponentLinesCountRef.current = data.linesCount;
             setOpponentLinesCount(data.linesCount);
           }
 
@@ -585,6 +700,8 @@ export default function App() {
     setRoundWinnerInfo(null);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevOpponentLinesCountRef.current = 0;
+    setLineAlert(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setCurrentRound(roundNum || currentRound + 1);
@@ -627,6 +744,8 @@ export default function App() {
     setCurrentRound(1);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevOpponentLinesCountRef.current = 0;
+    setLineAlert(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setScreen('playing');
@@ -718,11 +837,19 @@ export default function App() {
     });
   };
 
-  // 3. Solo Practice vs Smart Bot Mode Flow
+  // 3. Solo Practice vs Smart Bot Mode Flow (properly swaps AI opponent based on selected player)
   const handlePlaySolo = () => {
     if (peerRef.current) peerRef.current.destroy();
     setRole('solo');
-    setOpponentName(isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
+
+    // If Date Night is active: if player is Renia -> opponent is Yugi (AI). If player is Yugi -> opponent is Renia (AI)
+    const soloOpponentName = isDateNight
+      ? playerName === 'Renia'
+        ? 'Yugi (AI 🥂)'
+        : 'Renia (AI 💕)'
+      : 'Smart Bot (AI)';
+
+    setOpponentName(soloOpponentName);
     setBoard(generateBoard());
     setBotBoard(generateBoard());
     setCalledNumbers([]);
@@ -735,10 +862,12 @@ export default function App() {
     setCurrentRound(1);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevOpponentLinesCountRef.current = 0;
+    setLineAlert(null);
     setTurn('player');
     setFirstTurnRole('player');
     setScreen('playing');
-    showToast(`Solo Series: Best of ${seriesLength}. You go first!`);
+    showToast(`Solo Practice vs ${soloOpponentName}! Best of ${seriesLength}`);
   };
 
   // Share Invite Link Helper
@@ -808,10 +937,40 @@ export default function App() {
 
       // Check bot lines count
       const botEval = evaluateBoard(botBoard, nextCalled);
+      if (botEval.completedLinesCount > prevOpponentLinesCountRef.current && botEval.completedLinesCount < 5) {
+        if (isDateNight) {
+          playRomanticChime();
+        } else {
+          playLineCompleteSound();
+        }
+        const botDisplayName = isDateNight
+          ? playerName === 'Renia'
+            ? 'Yugi (AI 🥂)'
+            : 'Renia (AI 💕)'
+          : 'Smart Bot';
+        triggerLineAlert({
+          title:
+            botEval.completedLinesCount === 4
+              ? `🚨 ${botDisplayName} HAS 4 LINES!`
+              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} completed a line! (${botEval.completedLinesCount}/5)`,
+          subtitle:
+            botEval.completedLinesCount === 4
+              ? 'ONE AWAY FROM BINGO! Watch out! 💓'
+              : `${botDisplayName} just claimed another line!`,
+          isOpponent: true,
+          count: botEval.completedLinesCount
+        });
+      }
+      prevOpponentLinesCountRef.current = botEval.completedLinesCount;
       setOpponentLinesCount(botEval.completedLinesCount);
 
       if (botEval.completedLinesCount >= 5) {
-        recordRoundResult('opponent', isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
+        const botDisplayName = isDateNight
+          ? playerName === 'Renia'
+            ? 'Yugi (AI 🥂)'
+            : 'Renia (AI 💕)'
+          : 'Smart Bot (AI)';
+        recordRoundResult('opponent', botDisplayName);
         return;
       }
 
@@ -856,6 +1015,32 @@ export default function App() {
       const playerEval = evaluateBoard(board, nextCalled);
       const botEval = evaluateBoard(botBoard, nextCalled);
 
+      const botDisplayName = isDateNight
+        ? playerName === 'Renia'
+          ? 'Yugi (AI 🥂)'
+          : 'Renia (AI 💕)'
+        : 'Smart Bot (AI)';
+
+      if (botEval.completedLinesCount > prevOpponentLinesCountRef.current && botEval.completedLinesCount < 5) {
+        if (isDateNight) {
+          playRomanticChime();
+        } else {
+          playLineCompleteSound();
+        }
+        triggerLineAlert({
+          title:
+            botEval.completedLinesCount === 4
+              ? `🚨 ${botDisplayName} HAS 4 LINES!`
+              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} completed a line! (${botEval.completedLinesCount}/5)`,
+          subtitle:
+            botEval.completedLinesCount === 4
+              ? 'ONE AWAY FROM BINGO! Watch out! 💓'
+              : `${botDisplayName} just claimed another line!`,
+          isOpponent: true,
+          count: botEval.completedLinesCount
+        });
+      }
+      prevOpponentLinesCountRef.current = botEval.completedLinesCount;
       setOpponentLinesCount(botEval.completedLinesCount);
 
       const botWon = botEval.completedLinesCount >= 5;
@@ -864,7 +1049,7 @@ export default function App() {
       if (botWon && playerWon) {
         recordRoundResult('tie', 'Both Players');
       } else if (botWon) {
-        recordRoundResult('opponent', isDateNight ? 'Renia (AI 💕)' : 'Smart Bot (AI)');
+        recordRoundResult('opponent', botDisplayName);
       } else if (playerWon) {
         recordRoundResult('local', playerName);
       } else {
@@ -873,7 +1058,18 @@ export default function App() {
     }, 650);
 
     return () => clearTimeout(timer);
-  }, [role, screen, turn, botBoard, calledNumbers, board, playerName, isDateNight, recordRoundResult]);
+  }, [
+    role,
+    screen,
+    turn,
+    botBoard,
+    calledNumbers,
+    board,
+    playerName,
+    isDateNight,
+    recordRoundResult,
+    triggerLineAlert
+  ]);
 
   // Handle Series Rematch Click
   const handleSeriesRematch = () => {
@@ -923,6 +1119,9 @@ export default function App() {
     setLastCalled(null);
     setLocalScore(0);
     setOpponentScore(0);
+    prevCompletedLinesRef.current = 0;
+    prevOpponentLinesCountRef.current = 0;
+    setLineAlert(null);
   };
 
   // Status banner text with Date Night customization
@@ -974,16 +1173,16 @@ export default function App() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -15, scale: 0.95 }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 border text-xs sm:text-sm font-semibold tracking-wide ${
+            className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 border text-xs sm:text-sm font-semibold tracking-wide ${
               isDateNight
-                ? 'border-rose-400/30 text-rose-100 bg-rose-950/80 shadow-rose-950/50'
+                ? 'border-rose-400/30 text-rose-100 bg-rose-950/90 shadow-rose-950/60'
                 : 'border-white/20 text-white'
             }`}
           >
             {isDateNight ? (
-              <Heart size={16} className="text-rose-400 fill-rose-400 animate-pulse" />
+              <Heart size={15} className="text-rose-400 fill-rose-400 animate-pulse" />
             ) : (
-              <Sparkles size={16} className="text-amber-400" />
+              <Sparkles size={15} className="text-amber-400" />
             )}
             <span>{toastMessage}</span>
           </motion.div>
@@ -1045,7 +1244,7 @@ export default function App() {
           </div>
 
           {/* Date Night Mode Toggle Pill */}
-          <div className="my-2.5">
+          <div className="my-2">
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleToggleDateNight}
@@ -1090,9 +1289,9 @@ export default function App() {
           {/* Date Night Persona Quick Switcher */}
           {isDateNight && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-2 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
+              className="mb-2 p-2 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
             >
               <span className="text-[11px] font-semibold text-rose-300">Choose Player:</span>
               <div className="flex gap-2">
@@ -1120,10 +1319,77 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* Yugi & Renia Exclusive Lifetime Scoreboard on Main Page */}
+          {isDateNight && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-2.5 p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-300 flex items-center gap-1">
+                  <Heart size={12} className="text-rose-400 fill-rose-400" />
+                  <span>Yugi & Renia Lifetime Score</span>
+                </span>
+                <span className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+                  <Flame size={12} className="text-amber-400 fill-amber-400" />
+                  <span>
+                    Streak:{' '}
+                    {stats.streakHolder !== 'None'
+                      ? `${stats.streakHolder} (${stats.currentStreak || 0})`
+                      : 'None'}
+                  </span>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-center">
+                {/* Yugi Side */}
+                <div
+                  className={`p-2 rounded-xl border transition ${
+                    playerName === 'Yugi'
+                      ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
+                      : 'bg-slate-900/60 border-slate-700/40'
+                  }`}
+                >
+                  <div className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                    <span>Yugi</span> 🥂
+                  </div>
+                  <div className="text-xl font-black text-amber-400 font-mono leading-none my-1">
+                    {stats.yugiSeriesWon || 0}{' '}
+                    <span className="text-[10px] text-slate-400 font-sans font-bold">Series</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300">
+                    {stats.yugiRoundsWon || 0} Rounds Won
+                  </div>
+                </div>
+
+                {/* Renia Side */}
+                <div
+                  className={`p-2 rounded-xl border transition ${
+                    playerName === 'Renia'
+                      ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
+                      : 'bg-slate-900/60 border-slate-700/40'
+                  }`}
+                >
+                  <div className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                    <span>Renia</span> 🌹
+                  </div>
+                  <div className="text-xl font-black text-rose-300 font-mono leading-none my-1">
+                    {stats.reniaSeriesWon || 0}{' '}
+                    <span className="text-[10px] text-slate-400 font-sans font-bold">Series</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300">
+                    {stats.reniaRoundsWon || 0} Rounds Won
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Name Input & Best-of Selector */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {/* Player Name Card */}
-            <div className="glass-card p-3 space-y-1.5">
+            <div className="glass-card p-3 space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Your Player Name
               </label>
@@ -1133,7 +1399,7 @@ export default function App() {
                 value={playerName}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Enter name"
-                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-sm font-semibold text-white placeholder-slate-500 outline-none transition"
+                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-1.5 text-sm font-semibold text-white placeholder-slate-500 outline-none transition"
               />
             </div>
 
@@ -1236,7 +1502,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Solo Practice vs Smart Bot */}
+            {/* Solo Practice Button - Properly labels opponent based on selected player */}
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handlePlaySolo}
@@ -1245,7 +1511,7 @@ export default function App() {
               <Bot size={16} className={isDateNight ? 'text-rose-400' : 'text-emerald-400'} />
               <span>
                 {isDateNight
-                  ? 'Solo Practice vs Renia AI 💕'
+                  ? `Solo Practice vs ${playerName === 'Renia' ? 'Yugi AI 🥂' : 'Renia AI 💕'}`
                   : `Play Solo vs Smart Bot (Best of ${seriesLength})`}
               </span>
             </motion.button>
@@ -1259,9 +1525,9 @@ export default function App() {
             >
               <Flame size={12} className="text-amber-400" />
               <span>
-                Lifetime Series: <strong>{stats.localSeriesWon}</strong>W -{' '}
-                <strong>{stats.opponentSeriesWon}</strong>L • Streak: 🔥{' '}
-                <strong>{stats.currentStreak}</strong>
+                {isDateNight
+                  ? `Yugi: ${stats.yugiSeriesWon || 0}W • Renia: ${stats.reniaSeriesWon || 0}W • Streak: 🔥 ${stats.currentStreak || 0}`
+                  : `Lifetime Series: ${stats.localSeriesWon}W - ${stats.opponentSeriesWon}L • Streak: 🔥 ${stats.currentStreak}`}
               </span>
             </button>
           </div>
@@ -1384,7 +1650,7 @@ export default function App() {
       {/* SCREEN 3: GAME ARENA */}
       {/* ================================================================ */}
       {(screen === 'playing' || screen === 'round_over' || screen === 'series_over') && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-2.5 max-w-md mx-auto">
+        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-2 max-w-md mx-auto">
           {/* Top Bar: Navigation, Series Indicator, Mute */}
           <div className="w-full flex items-center justify-between pt-1">
             <button
@@ -1508,6 +1774,46 @@ export default function App() {
             </div>
           </div>
 
+          {/* Prominent Line Completion Alert Banner (Visible for 4.8s when either player completes a line) */}
+          <AnimatePresence>
+            {lineAlert && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: -8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
+                  lineAlert.count >= 4
+                    ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 shadow-amber-950/70 text-amber-100 ring-1 ring-amber-400/50'
+                    : lineAlert.isOpponent
+                    ? isDateNight
+                      ? 'bg-gradient-to-r from-amber-950/90 via-rose-950/90 to-amber-900/80 border-amber-400/60 shadow-amber-950/60 text-amber-100'
+                      : 'bg-indigo-950/90 border-indigo-400/50 text-indigo-100'
+                    : isDateNight
+                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/90 to-pink-950/90 border-rose-400/60 shadow-rose-950/60 text-rose-100'
+                    : 'bg-emerald-950/90 border-emerald-400/50 text-emerald-100'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">
+                    {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
+                  </span>
+                  <div>
+                    <div className="text-xs font-black tracking-tight leading-tight">
+                      {lineAlert.title}
+                    </div>
+                    <div className="text-[10px] opacity-85 leading-tight">
+                      {lineAlert.subtitle}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/10 shrink-0">
+                  {lineAlert.count}/5 Lines
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* B-I-N-G-O Header Badges */}
           <div className="flex items-center justify-center gap-2 my-0.5">
             {BINGO_LETTERS.map((letter, index) => {
@@ -1550,7 +1856,7 @@ export default function App() {
           </div>
 
           {/* Pre-Game Shuffle Pill / Move Status */}
-          <div className="flex flex-col items-center justify-center min-h-[40px] my-0.5">
+          <div className="flex flex-col items-center justify-center min-h-[38px] my-0.5">
             {calledNumbers.length === 0 ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
@@ -1625,11 +1931,7 @@ export default function App() {
                 <h3 className="text-xl font-black text-white tracking-tight">
                   {roundWinnerInfo.name} Secured the Round!
                 </h3>
-                <p className="text-xs text-slate-300">
-                  {isDateNight
-                    ? `${roundWinnerInfo.name} completes 5 lines with love! 💕`
-                    : `${roundWinnerInfo.name} completed 5 lines!`}
-                </p>
+                <p className="text-xs text-slate-300">{roundWinnerInfo.reason}</p>
               </div>
 
               {/* Updated Scorecard */}
@@ -1796,11 +2098,17 @@ export default function App() {
                   Series Record
                 </span>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold text-white">{playerName}</span>
-                  <span className="text-base font-black text-amber-400">
-                    {stats.localSeriesWon} - {stats.opponentSeriesWon}
+                  <span className="font-bold text-white">
+                    {isDateNight ? 'Yugi 🥂' : playerName}
                   </span>
-                  <span className="font-bold text-slate-300">{opponentName}</span>
+                  <span className="text-base font-black text-amber-400 font-mono">
+                    {isDateNight
+                      ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
+                      : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
+                  </span>
+                  <span className="font-bold text-slate-300">
+                    {isDateNight ? 'Renia 🌹' : opponentName}
+                  </span>
                 </div>
               </div>
 
@@ -1808,18 +2116,18 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2 text-center text-xs">
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    Total Rounds Won
+                    {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
                   </span>
                   <span className="text-base font-extrabold text-white">
-                    {stats.localRoundsWon}
+                    {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
                   </span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    Opponent Rounds
+                    {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
                   </span>
                   <span className="text-base font-extrabold text-slate-300">
-                    {stats.opponentRoundsWon}
+                    {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
                   </span>
                 </div>
               </div>
@@ -1833,10 +2141,8 @@ export default function App() {
                   <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1">
                     <Flame size={14} className="text-amber-400" />
                     <span>
-                      {stats.streakHolder === 'local'
-                        ? `${playerName} (${stats.currentStreak} in a row)`
-                        : stats.streakHolder === 'opponent'
-                        ? `${opponentName} (${stats.currentStreak} in a row)`
+                      {stats.streakHolder !== 'None'
+                        ? `${stats.streakHolder} (${stats.currentStreak} in a row)`
                         : 'No active streak'}
                     </span>
                   </span>
