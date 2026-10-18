@@ -216,18 +216,30 @@ export default function App() {
     };
   }, []);
 
-  // Track completed lines to play chime
+  // Track completed lines to play chime & romantic quotes
   const prevCompletedLinesRef = useRef(0);
   useEffect(() => {
     if (completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
       if (isDateNight) {
         playRomanticChime();
+        if (completedLinesCount === 4) {
+          showToast("4 lines down! ONE AWAY FROM BINGO! Hold your breath! 💓");
+        } else {
+          const lineQuotes = [
+            `${playerName} claimed a line! What a charmer! ❤️`,
+            "One line closer to your heart... 💌",
+            "That line was pure poetry in motion! ✨",
+            `A line for ${playerName}, a smile for us. 🥰`,
+            `${playerName} locked in a line! Unstoppable grace! 💕`
+          ];
+          showToast(lineQuotes[(completedLinesCount - 1) % lineQuotes.length]);
+        }
       } else {
         playLineCompleteSound();
       }
     }
     prevCompletedLinesRef.current = completedLinesCount;
-  }, [completedLinesCount, screen, isDateNight]);
+  }, [completedLinesCount, screen, isDateNight, playerName, showToast]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -318,12 +330,24 @@ export default function App() {
         const seriesWinner = localClenched ? 'local' : 'opponent';
         const seriesWinnerName = localClenched ? playerName : opponentName;
 
+        const seriesVictoryQuotes = [
+          `${seriesWinnerName} is the undisputed Date Night Queen! 👑💖`,
+          `${seriesWinnerName} takes the crown, but surrenders all hugs! 🥂🌹`,
+          `Victory sealed with a kiss! 💋`,
+          `${seriesWinnerName} gets forehead kisses on demand for 24 hours! 😘`,
+          `All hail the reigning Bingo Monarch! 👸`,
+          `Defeated by your cuteness and your 5x5 grid! 🫠`
+        ];
+
+        const romanticSeriesReason =
+          seriesVictoryQuotes[(nextLocalScore + nextOpponentScore) % seriesVictoryQuotes.length];
+
         setSeriesWinnerInfo({
           winner: seriesWinner,
           name: seriesWinnerName,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
           reason: isDateNight
-            ? `${seriesWinnerName} is the Date Night Series Champion! 🥂🌹`
+            ? romanticSeriesReason
             : `${seriesWinnerName} won the Best of ${seriesLength} Series!`
         });
 
@@ -351,9 +375,35 @@ export default function App() {
         fireVictoryConfetti();
       } else {
         // Round concluded, series continues
+        const tieReasons = [
+          "It's a tie! Destined minds think alike. 💫",
+          "Simultaneous BINGO! Even our boards are in love. ❤️",
+          "A perfect tie — soulmates can’t even beat each other! 🥂",
+          "Two boards, one heartbeat. It’s a draw! 🕊️",
+          "Neither loses, meaning double the hugs! 🫂",
+          "Cosmic synchronization: 100% matched. 🌌"
+        ];
+
+        const roundWinQuotes = [
+          `${winnerDisplay} claimed a line & took the round! What a charmer! ❤️`,
+          `That round was pure poetry in motion! ✨`,
+          `A round for ${winnerDisplay}, a smile for us both. 🥰`,
+          `${winnerDisplay} locked in 5 lines with unstoppable grace! 💕`
+        ];
+
+        let roundReason = `${winnerDisplay} completed 5 lines!`;
+        if (isDateNight) {
+          if (winnerRole === 'tie') {
+            roundReason = tieReasons[currentRound % tieReasons.length];
+          } else {
+            roundReason = roundWinQuotes[currentRound % roundWinQuotes.length];
+          }
+        }
+
         setRoundWinnerInfo({
           winner: winnerRole,
           name: winnerDisplay,
+          reason: roundReason,
           localScore: nextLocalScore,
           opponentScore: nextOpponentScore,
           roundNum: currentRound
@@ -880,10 +930,28 @@ export default function App() {
   let statusBannerText = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
 
   if (isDateNight) {
+    const waitingQuotes = [
+      `Waiting for ${opponentName}’s sweet move... 💕`,
+      `Take your time, beauty... admiring you. 🌹`,
+      `${opponentName} is plotting something dangerously cute... 💭`,
+      `No pressure, my love, but the crown is waiting! 👑`,
+      `Listening to ${opponentName}’s cute thinking sounds... 🎶`,
+      `Contemplating love or your next number? 🥰`
+    ];
+
+    const turnQuotes = [
+      'Your turn, gorgeous! Make it count. ❤️',
+      'Show me how a master plays, darling. 🥂',
+      'The board is yours, my queen. 👑',
+      'Time to show who truly runs this house! 💅',
+      'Pick a lucky number for us both! 🍀',
+      'Your move, my love! ❤️'
+    ];
+
     if (isLocalTurn) {
-      statusBannerText = `Your turn, my love! ❤️`;
+      statusBannerText = turnQuotes[calledNumbers.length % turnQuotes.length];
     } else {
-      statusBannerText = `Waiting for ${opponentName}'s sweet move... 💕`;
+      statusBannerText = waitingQuotes[calledNumbers.length % waitingQuotes.length];
     }
   }
 
