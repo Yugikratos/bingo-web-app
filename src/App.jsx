@@ -1129,23 +1129,47 @@ export default function App() {
   let statusBannerText = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
 
   if (isDateNight) {
-    const waitingQuotes = [
-      `Waiting for ${opponentName}’s sweet move... 💕`,
-      `Take your time, beauty... admiring you. 🌹`,
-      `${opponentName} is plotting something dangerously cute... 💭`,
-      `No pressure, my love, but the crown is waiting! 👑`,
-      `Listening to ${opponentName}’s cute thinking sounds... 🎶`,
-      `Contemplating love or your next number? 🥰`
-    ];
+    const isYugi = playerName === 'Yugi';
 
-    const turnQuotes = [
-      'Your turn, gorgeous! Make it count. ❤️',
-      'Show me how a master plays, darling. 🥂',
-      'The board is yours, my queen. 👑',
-      'Time to show who truly runs this house! 💅',
-      'Pick a lucky number for us both! 🍀',
-      'Your move, my love! ❤️'
-    ];
+    const waitingQuotes = isYugi
+      ? [
+          // Yugi is waiting for his girlfriend Renia
+          `Waiting for Renia’s sweet move... 💕`,
+          `Take your time, beauty... admiring you. 🌹`,
+          `Renia is plotting something dangerously cute... 💭`,
+          `No pressure, my queen, but the crown is waiting! 👑`,
+          `Listening to Renia’s cute thinking sounds... 🎶`,
+          `Contemplating love or your next number, Renia? 🥰`
+        ]
+      : [
+          // Renia is waiting for her boyfriend Yugi
+          `Waiting for Yugi’s genius move... ✨`,
+          `Take your time, handsome... I'm watching you. 😉`,
+          `Yugi is overthinking as usual... 💭`,
+          `Show me what you've got, king! 👑`,
+          `Watching Yugi cook up his strategy... 🥂`,
+          `Contemplating love or your next number, Yugi? 🥰`
+        ];
+
+    const turnQuotes = isYugi
+      ? [
+          // It is Yugi's turn
+          'Your turn, handsome! Make it count. ❤️',
+          'Show Renia how a master plays! 🥂',
+          'The board is yours, king! 👑',
+          'Make your lady proud, Yugi! 🌹',
+          'Time to show that genius strategy! ✨',
+          'Your move, my love! ❤️'
+        ]
+      : [
+          // It is Renia's turn
+          'Your turn, gorgeous! Make it count. ❤️',
+          'The board is yours, my queen. 👑',
+          'Show Yugi who truly runs this house! 💅',
+          'Show me how a master plays, darling. 🥂',
+          'Your move, beauty! 🌹',
+          'Pick a lucky number for us both! 🍀'
+        ];
 
     if (isLocalTurn) {
       statusBannerText = turnQuotes[calledNumbers.length % turnQuotes.length];
