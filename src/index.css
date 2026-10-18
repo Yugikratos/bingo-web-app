@@ -1,0 +1,275 @@
+@import "tailwindcss";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg-dark: #090A0F;
+  --indigo-primary: #6366F1;
+  --indigo-dark: #4338CA;
+  --emerald-primary: #10B981;
+  --emerald-dark: #059669;
+  --gold-primary: #FBBF24;
+  --gold-dark: #D97706;
+  --slate-tile: rgba(30, 41, 59, 0.85);
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", -apple-system, system-ui, sans-serif;
+}
+
+html, body {
+  background-color: var(--bg-dark);
+  color: #F8FAFC;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient Radial Glow Orbs */
+.ambient-glow-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.glow-orb-top-left {
+  position: absolute;
+  top: -15vw;
+  left: -15vw;
+  width: 75vw;
+  height: 75vw;
+  max-width: 500px;
+  max-height: 500px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0) 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: pulseIndigo 8s ease-in-out infinite alternate;
+}
+
+.glow-orb-bottom-right {
+  position: absolute;
+  bottom: -15vw;
+  right: -15vw;
+  width: 75vw;
+  height: 75vw;
+  max-width: 500px;
+  max-height: 500px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0) 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: pulseEmerald 8s ease-in-out infinite alternate;
+}
+
+@keyframes pulseIndigo {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.8; }
+  100% { transform: scale(1.15) translate(4%, 4%); opacity: 1; }
+}
+
+@keyframes pulseEmerald {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.7; }
+  100% { transform: scale(1.2) translate(-4%, -4%); opacity: 0.95; }
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.glass-card {
+  background: rgba(18, 24, 38, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-button {
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F8FAFC;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-button:active {
+  transform: scale(0.97);
+  background: rgba(45, 60, 85, 0.8);
+}
+
+/* Tactile 5x5 Grid Styling */
+.bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+  aspect-ratio: 1 / 1;
+}
+
+@media (max-height: 700px) {
+  .bingo-grid {
+    gap: 6px;
+    max-width: 330px;
+  }
+}
+
+@media (max-width: 360px) {
+  .bingo-grid {
+    gap: 5px;
+  }
+}
+
+/* Grid Tile Styling */
+.bingo-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.25rem;
+  border-radius: 14px;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--slate-tile);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 0 rgba(5, 7, 12, 0.85), 0 6px 12px rgba(0, 0, 0, 0.4);
+  color: #F8FAFC;
+  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+  aspect-ratio: 1 / 1;
+}
+
+@media (max-width: 375px) {
+  .bingo-tile {
+    font-size: 1.1rem;
+    border-radius: 12px;
+  }
+}
+
+.bingo-tile.uncalled:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 0 rgba(5, 7, 12, 0.85);
+}
+
+/* Called Tile: Depressed & Deep Indigo */
+.bingo-tile.called {
+  background: linear-gradient(135deg, #6366F1 0%, #4338CA 100%);
+  border-color: #818CF8;
+  color: #FFFFFF;
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 14px rgba(99, 102, 241, 0.35);
+}
+
+/* Winning Line Tile: Radiant Emerald */
+.bingo-tile.winning {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+  border-color: #34D399 !important;
+  color: #FFFFFF !important;
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 18px rgba(16, 185, 129, 0.55) !important;
+  animation: pulseWinningTile 2.4s ease-in-out infinite;
+}
+
+@keyframes pulseWinningTile {
+  0%, 100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 14px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 24px rgba(16, 185, 129, 0.8);
+  }
+}
+
+/* Last Called Number Pulse Ring */
+.last-called-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 17px;
+  border: 2px solid #FBBF24;
+  pointer-events: none;
+  animation: pulseLastCalled 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseLastCalled {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+/* B-I-N-G-O Badges */
+.bingo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 1.25rem;
+  font-weight: 900;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 375px) {
+  .bingo-badge {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+    border-radius: 12px;
+  }
+}
+
+.bingo-badge.inactive {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #64748B;
+}
+
+.bingo-badge.active {
+  background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%);
+  border: 1px solid #FCD34D;
+  color: #18181B;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.65), 0 4px 12px rgba(0, 0, 0, 0.35);
+  transform: translateY(-2px) scale(1.06);
+}
+
+/* Custom scrollbars disabled */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
