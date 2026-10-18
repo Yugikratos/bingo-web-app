@@ -1,248 +1,223 @@
 # BINGO // 25 — iOS Premium Edition
-> A complete, production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile (`100dvh` iOS Safari first) with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset Web Audio synthesis, and an intelligent AI practice bot.
+> A production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile (`100dvh` iOS Safari first) with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset Web Audio synthesis, and an intelligent AI practice bot.
+
+[![Live App](https://img.shields.io/badge/Live_Deployment-Vercel-black?style=for-the-badge&logo=vercel)](https://bingo-web-app-nine.vercel.app)
+[![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![WebRTC](https://img.shields.io/badge/WebRTC-PeerJS-FF6B6B?style=for-the-badge&logo=webrtc&logoColor=white)](https://peerjs.com/)
+
+---
+
+## 🌐 Live Deployment
+
+* **Production URL:** [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app)
+* **Direct Invite Format:** `https://bingo-web-app-nine.vercel.app/?room=XXXX` (where `XXXX` is any 4-digit room code)
 
 ---
 
 ## 🌟 Overview & Key Highlights
 
-* **Zero-Backend Architecture**: Runs 100% in the browser. No databases, no Firebase, no custom backend servers, and no API keys required.
-* **Direct WebRTC P2P**: Two players anywhere in the world connect directly peer-to-peer using **PeerJS** via a 4-digit room code or shareable invite link (`?room=XXXX`).
-* **iOS 18 Dark Obsidian Aesthetics**: Designed specifically for iPhone Safari viewport locks (`100dvh`, `viewport-fit=cover`, `-webkit-touch-callout: none`), tactile 3D glass tiles, and ambient radial glow orbs.
-* **Zero-Asset Web Audio Synthesizer**: Pure Web Audio API oscillators synthesize physical mechanical pops, woody thocks, harmonic line chimes, triumphant arpeggio fanfares, and percussive shuffle ticks without external MP3/WAV files.
-* **Smart AI Bot Practice Mode**: Play solo anytime with a heuristic AI bot featuring a natural 650ms thinking delay and line-maximization algorithms.
-* **12-Line Win Detector & Simultaneous Tie Handling**: Detects all 5 rows, 5 columns, and 2 diagonals; gracefully handles simultaneous 5-line wins with dual celebrations.
+* **Zero-Backend Architecture**: Operates 100% client-side in the browser. Requires zero database instances, no Firebase, no custom backend relay servers, and zero API keys.
+* **Instant Serverless P2P Multiplayer**: Direct browser-to-browser WebRTC data channels via **PeerJS** using a deterministic 4-digit room code or shareable invite link (`?room=XXXX`).
+* **iOS 18 Dark Obsidian Aesthetics**: Mobile-first design tailored for iPhone Safari:
+  - Exact `100dvh` viewport locks and native PWA home-screen support (`apple-mobile-web-app-capable`).
+  - Tactile 3D glass tiles with physical bottom lip, depressed called states, and radiant emerald completed-line glows.
+  - Ambient radial background glow orbs (`#6366F1` Indigo & `#10B981` Emerald) for depth.
+* **Zero-Asset Web Audio Synthesizer**: Pure Web Audio API oscillators mathematically synthesizing mechanical pops, woody opponent thocks, harmonic line chimes, triumphant arpeggio fanfares, and percussive shuffle ticks without external MP3/WAV files.
+* **Smart AI Practice Bot**: Play solo anytime with a heuristic AI bot featuring a natural 650ms thinking delay and weighted line-progression scoring.
+* **12-Line Win Detector & Simultaneous Tie Handling**: Evaluates all 5 rows, 5 columns, and 2 diagonals simultaneously; handles mutual 5-line completions gracefully with dual confetti celebrations.
 
 ---
 
-## 🛠️ Complete Tech Stack & Dependencies
+## 🛠️ Complete Tech Stack & Architecture Details
 
-| Category | Technology | Version | Purpose & Rationale |
+| Layer | Technology | Version | Purpose & Implementation Details |
 | :--- | :--- | :--- | :--- |
-| **Frontend Framework** | **React** | `^19.2.8` | Declarative UI, state management, hooks (`useState`, `useEffect`, `useRef`, `useCallback`). |
-| **DOM Renderer** | **React DOM** | `^19.2.8` | React DOM bindings for client-side rendering. |
-| **Build Tool / Bundler** | **Vite** | `^8.3.0` | Ultra-fast HMR and optimized production bundling with `@vitejs/plugin-react`. |
-| **CSS Engine** | **Tailwind CSS v4** | `^4.0.0` | Next-generation utility styling via `@tailwindcss/vite` integrated with custom CSS variables. |
-| **P2P Networking** | **PeerJS** | `^1.5.5` | WebRTC peer-to-peer data channels for zero-latency, serverless packet exchange. |
-| **Animation Engine** | **Framer Motion** | `^14.3.0` | Spring physics, entrance/exit modals, scale pulses on B-I-N-G-O badges, and toasts. |
-| **Icons** | **Lucide React** | `^1.59.0` | Crisp SVG iconography (`Trophy`, `Shuffle`, `Share2`, `Copy`, `Volume2`, `Bot`, `Users`, etc.). |
-| **Celebration Effects**| **Canvas Confetti**| `^1.9.4` | Physics-driven confetti bursts upon B-I-N-G-O victory or simultaneous ties. |
-| **Audio Synthesizer** | **Web Audio API** | Native | Zero-asset, zero-latency synthesizer using `AudioContext`, oscillators, and gain ramps. |
-| **Linter** | **Oxlint** | `^1.81.0` | High-performance JavaScript/JSX static analysis. |
+| **Frontend Framework** | **React** | `^19.2.8` | Declarative component state machine managing Lobby, Waiting Room, Arena, and Rematch flows (`useState`, `useEffect`, `useRef`, `useCallback`). |
+| **DOM Renderer** | **React DOM** | `^19.2.8` | Client-side root rendering in React 19 `StrictMode`. |
+| **Build Tool & Bundler** | **Vite** | `^8.3.0` | High-performance bundling and sub-second HMR via `@vitejs/plugin-react`. |
+| **Styling & CSS** | **Tailwind CSS v4** | `^4.0.0` | Utility CSS engine configured via `@tailwindcss/vite` combined with custom Obsidian glassmorphism rules. |
+| **P2P Multiplayer** | **PeerJS (WebRTC)**| `^1.5.5` | Decentralized WebRTC peer connections using deterministic room addressing (`bingo25-live-room-XXXX`). |
+| **Animations & UI** | **Framer Motion** | `^14.3.0` | Fluid spring physics, modal transitions, and dynamic pulse animations for B-I-N-G-O letter badges. |
+| **Icons** | **Lucide React** | `^1.59.0` | Accessible iconography (`Trophy`, `Shuffle`, `Share2`, `Copy`, `Volume2`, `Bot`, `Users`, `RefreshCw`, etc.). |
+| **Celebrations** | **Canvas Confetti**| `^1.9.4` | Particle physics confetti burst effects upon achieving B-I-N-G-O or simultaneous ties. |
+| **Audio Synthesis** | **Web Audio API** | Native | Zero-latency synthesis using `AudioContext`, gain nodes, and frequency ramps; lazy-initialized to satisfy iOS autoplay policies. |
+| **Linter / QA** | **Oxlint** | `^1.81.0` | Fast static code analysis and quality verification. |
 
 ---
 
-## 📂 Project Architecture
+## 🎯 Core Features & Game Mechanics
 
-```
-bingo-web-app/
-├── index.html               # Mobile viewport lock, PWA meta tags, theme color, dark canvas
-├── package.json             # Project dependencies and npm scripts
-├── vite.config.js           # Vite configuration with React and Tailwind CSS v4 plugins
-├── dist/                    # Production bundle output (HTML, JS, CSS)
-└── src/
-    ├── main.jsx             # React 19 entry point and StrictMode wrapper
-    ├── index.css            # 100dvh locks, obsidian background, ambient orbs, 3D tactile grid
-    ├── App.jsx              # Complete state machine, WebRTC protocol, Arena, Modals & AI
-    └── utils/
-        ├── bingoEngine.js   # Fisher-Yates 1-25 generator, 12-line detector, Smart Bot AI
-        └── sound.js         # Zero-asset Web Audio API synthesizer & sound controls
-```
+### 1. Dual Play Modes
+* **2-Player Live Multiplayer**:
+  - Connect two devices anywhere in the world over WebRTC using a simple 4-digit code.
+  - Native iOS Web Share API integration (`navigator.share`) with automatic clipboard copy fallback.
+* **Solo vs Smart AI Bot**:
+  - Practice offline or solo without needing a second player.
+  - The AI maintains a hidden 5x5 board and computes optimal moves using a line-maximization heuristic with a natural 650ms thinking delay.
 
----
+### 2. Pre-Game Board Customization
+* **Fisher-Yates 1–25 Board Generator**: Randomizes numbers 1 through 25 with uniform distribution.
+* **"Shuffle My Board" Control**: Before the first number of a match is called (`calledNumbers.length === 0`), players can reshuffle their grid layout freely. Once the first move is played, the board layout locks permanently.
 
-## 🧩 Deep Dive into Modules
+### 3. Real-Time 12-Line Win Detector (`evaluateBoard`)
+* Continuously evaluates all 12 potential winning lines:
+  - **5 Horizontal Rows**: `[0..4]`, `[5..9]`, `[10..14]`, `[15..19]`, `[20..24]`
+  - **5 Vertical Columns**: `[0,5,10,15,20]`, `[1,6,11,16,21]`, `[2,7,12,17,22]`, `[3,8,13,18,23]`, `[4,9,14,19,24]`
+  - **2 Diagonals**: `[0,6,12,18,24]` (Main), `[4,8,12,16,20]` (Anti)
+* Uses a `Set` for $O(1)$ constant-time tile checks.
+* When `completedLinesCount >= 5`, the game concludes immediately with a **B-I-N-G-O** victory.
 
-### 1. iOS Viewport & Shell (`index.html`)
-* **Strict Viewport Lock**:
-  ```html
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  ```
-  Prevents Safari auto-zoom on taps and ensures the layout fits iPhone notch/island safe areas.
-* **iOS Web App (PWA) Tags**:
-  ```html
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#090A0F" />
-  ```
-* **No Flash Dark Canvas**: Initial CSS applied directly in `<head>` so screen transitions and initial loads never flash white.
+### 4. Simultaneous Tie Resolution
+* If a called number grants both players their 5th line simultaneously:
+  - Game recognizes a mutual win condition.
+  - Dispatches `CLAIM_TIE` packet across the WebRTC data channel.
+  - Both players receive the "SIMULTANEOUS TIE!" celebratory modal, fanfare audio, and dual confetti bursts.
 
----
-
-### 2. Design System: "iOS 18 Dark Obsidian & Tactile Glass" (`src/index.css`)
-* **Dynamic Viewport Height (`100dvh`)**: Locks height to `100dvh` and disables pull-to-refresh / rubber-banding:
-  ```css
-  overflow: hidden;
-  position: fixed;
-  touch-action: manipulation;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  ```
-* **Ambient Glow Orbs**: Two fixed radial blur orbs create subtle depth behind the glass cards:
-  - Top-Left: Indigo (`#6366F1`) with 8s ease-in-out breathing animation.
-  - Bottom-Right: Emerald (`#10B981`) with counter-phase pulsation.
-* **Tactile 5x5 Grid Tiles**:
-  - **Uncalled Tile**: `rgba(30, 41, 59, 0.85)` with a top inner rim highlight (`inset 0 1px 0 rgba(255,255,255,0.14)`) and a 3D physical bottom lip (`0 4px 0 rgba(5, 7, 12, 0.85)`).
-  - **Called Tile**: Physically depresses down (`transform: translateY(2px)`), drops bottom lip to `1px`, and shifts to deep Indigo gradient (`linear-gradient(135deg, #6366F1, #4338CA)`).
-  - **Completed Line Tile**: Transitions to an energetic Emerald gradient (`linear-gradient(135deg, #10B981, #059669)`), `#34D399` border, and radiant pulse glow (`0 0 18px rgba(16, 185, 129, 0.55)`).
-  - **Last Called Number Ring**: Subtle gold pulse ring (`#FBBF24`) highlighting the most recently called tile so both players immediately see what was tapped.
-* **B-I-N-G-O Badges**:
-  - Inactive: Muted slate squircle badges.
-  - Active (1–5 lines completed): Ignites with warm gold gradient (`#FBBF24` to `#D97706`), bold dark text, and spring scale animation.
+### 5. Smart AI Practice Bot Heuristic (`getBestBotMove`)
+* Evaluates all remaining uncalled numbers on the bot's board:
+  - **Completes a Line**: `+1500` points
+  - **Creates 4-in-a-row**: `+200` points
+  - **Creates 3-in-a-row**: `+40` points
+  - **Creates 2-in-a-row**: `+10` points
+* Randomizes selection among ties to provide natural, non-repetitive gameplay.
 
 ---
 
-### 3. Zero-Asset Synthesized Audio Engine (`src/utils/sound.js`)
-All sound effects are mathematically synthesized using the native **Web Audio API** (`AudioContext`). No audio asset files need to be fetched over the network.
-* **Autoplay Compliance**: `AudioContext` is lazily initialized upon the first user tap to respect iOS Safari audio autoplay restrictions.
-* **Synthesized Audio Profiles**:
-  1. **`playTapSound()`** (Mechanical Tile Pop):
-     - Waveform: Triangle wave
-     - Pitch: 520 Hz ramping exponentially down to 180 Hz over 0.08s
-     - Gain: 0.3 down to 0.001
-  2. **`playOpponentTapSound()`** (Opponent Move Woody Thock):
-     - Waveform: Sine wave
-     - Pitch: 340 Hz ramping down to 220 Hz over 0.08s
-     - Gain: 0.32 down to 0.001
-  3. **`playLineCompleteSound()`** (Line Completion Two-Note Chime):
-     - Waveform: Sine wave
-     - Note 1: 587.33 Hz ($D_5$) at $t_0$, decaying over 0.28s
-     - Note 2: 880.00 Hz ($A_5$) at $t_0 + 0.12s$, decaying over 0.33s
-  4. **`playWinFanfare()`** (Triumphant 4-Note Arpeggio):
-     - Chord Sequence: $C_5$ (523.25 Hz) $\rightarrow$ $E_5$ (659.25 Hz) $\rightarrow$ $G_5$ (783.99 Hz) $\rightarrow$ $C_6$ (1046.50 Hz)
-     - Overlapping decays creating a celebratory harmonic progression.
-  5. **`playShuffleSound()`** (Board Shuffle Ticks):
-     - 3 rapid percussive micro-ticks (offsets: 0s, 0.04s, 0.08s) ramping 680 Hz to 260 Hz in 30ms.
-* **Mute Control**: Global toggle support (`toggleSoundMuted()`, `getSoundMuted()`) with instantaneous feedback.
+## 🔊 Zero-Asset Synthesized Audio Engine (`src/utils/sound.js`)
+
+All sound effects are synthesized via native mathematical oscillators, eliminating network asset requests and playback lag:
+
+1. **`playTapSound()`** (Mechanical Tile Pop):
+   - Waveform: `triangle`
+   - Frequency: `520 Hz` ramping down exponentially to `180 Hz` over `0.08s` (gain `0.3` to `0.001`).
+2. **`playOpponentTapSound()`** (Opponent Move Woody Thock):
+   - Waveform: `sine`
+   - Frequency: `340 Hz` ramping to `220 Hz` over `0.08s` (gain `0.32` to `0.001`).
+3. **`playLineCompleteSound()`** (Line Completion Chime):
+   - Waveform: `sine`
+   - Harmonic two-note chime: Note 1 at `587.33 Hz` ($D_5$), Note 2 at `880.00 Hz` ($A_5$) staggered by `0.12s`.
+4. **`playWinFanfare()`** (Triumphant 4-Note Arpeggio):
+   - Overlapping arpeggio chord: $C_5$ (`523.25 Hz`) $\rightarrow$ $E_5$ (`659.25 Hz`) $\rightarrow$ $G_5$ (`783.99 Hz`) $\rightarrow$ $C_6$ (`1046.50 Hz`).
+5. **`playShuffleSound()`** (Percussive Shuffle Tick):
+   - Triple micro-click burst at `0s`, `0.04s`, and `0.08s` ramping `680 Hz` down to `260 Hz` in `30ms`.
 
 ---
 
-### 4. 1–25 Classic Rules & Win Detector (`src/utils/bingoEngine.js`)
-* **Board Generation**:
-  - `generateBoard()`: Numbers 1 through 25 shuffled uniformly via the **Fisher-Yates (Knuth) Shuffle algorithm**.
-* **12 Win Lines Definition (`WIN_LINES`)**:
-  - **5 Rows**:
-    - Row 0: `[0, 1, 2, 3, 4]`
-    - Row 1: `[5, 6, 7, 8, 9]`
-    - Row 2: `[10, 11, 12, 13, 14]`
-    - Row 3: `[15, 16, 17, 18, 19]`
-    - Row 4: `[20, 21, 22, 23, 24]`
-  - **5 Columns**:
-    - Col 0: `[0, 5, 10, 15, 20]`
-    - Col 1: `[1, 6, 11, 16, 21]`
-    - Col 2: `[2, 7, 12, 17, 22]`
-    - Col 3: `[3, 8, 13, 18, 23]`
-    - Col 4: `[4, 9, 14, 19, 24]`
-  - **2 Diagonals**:
-    - Diagonal 1: `[0, 6, 12, 18, 24]` (Top-Left to Bottom-Right)
-    - Diagonal 2: `[4, 8, 12, 16, 20]` (Top-Right to Bottom-Left)
-* **Evaluation Algorithm (`evaluateBoard`)**:
-  - Evaluates board against a `Set` of called numbers for $O(1)$ lookups.
-  - Returns:
-    ```javascript
-    {
-      completedLinesCount: number,     // Total lines completed (0 to 12)
-      winningTileIndices: Set<number>,  // Exact tile indices belonging to completed lines
-      completedLineIds: number[]        // IDs of completed lines (0 to 11)
-    }
-    ```
-  - **B-I-N-G-O condition**: `completedLinesCount >= 5`.
-* **Smart AI Bot Move Selector (`getBestBotMove`)**:
-  - Simulates calling each candidate uncalled number on its hidden 5x5 board.
-  - Scores candidates using a weighted line-progression heuristic:
-    - **Completes a Line**: `+1500` pts
-    - **Creates 4-in-a-row**: `+200` pts
-    - **Creates 3-in-a-row**: `+40` pts
-    - **Creates 2-in-a-row**: `+10` pts
-  - Dynamic tie-breaking: Picks randomly among top-tied moves to maintain engaging gameplay.
+## 📡 WebRTC Data Channel Protocol (`src/App.jsx`)
 
----
+Rooms communicate peer-to-peer using deterministic room mapping: `const PEER_PREFIX = 'bingo25-live-room-';`.
 
-### 5. PeerJS WebRTC P2P Protocol & State Machine (`src/App.jsx`)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Host as Host Player
+    participant HostPeer as Host Peer (Prefix + Code)
+    participant GuestPeer as Guest Peer
+    actor Guest as Guest Player
 
-#### Deterministic Peer ID Addressing
-Every room maps to a WebRTC peer via a deterministic prefix:
-```javascript
-const PEER_PREFIX = 'bingo25-live-room-';
-const hostPeerId = PEER_PREFIX + roomCode; // e.g. bingo25-live-room-4821
+    Host->>HostPeer: Create Room (Generates 4-digit code)
+    Guest->>GuestPeer: Enters Code / Follows URL (?room=XXXX)
+    GuestPeer->>HostPeer: Connect via WebRTC Data Channel
+    GuestPeer->>HostPeer: HELLO { name: GuestName }
+    HostPeer->>GuestPeer: HELLO_ACK { name: HostName, turn: 'host' }
+    Note over Host,Guest: Match Begins (Arena Screen Loaded)
+
+    loop Gameplay Rounds
+        Host->>HostPeer: Calls Number (e.g. 17)
+        HostPeer->>GuestPeer: CALL_NUMBER { number: 17, nextTurn: 'guest', linesCount }
+        Guest->>GuestPeer: Calls Number (e.g. 8)
+        GuestPeer->>HostPeer: CALL_NUMBER { number: 8, nextTurn: 'host', linesCount }
+    end
+
+    alt 5 Lines Reached
+        HostPeer->>GuestPeer: CLAIM_WIN { winnerName: HostName }
+        Note over Host,Guest: Victory / Defeat Modal & Confetti
+    else Simultaneous 5 Lines Reached
+        GuestPeer->>HostPeer: CLAIM_TIE {}
+        Note over Host,Guest: Simultaneous Tie Modal & Confetti
+    end
+
+    opt Rematch Flow
+        GuestPeer->>HostPeer: REMATCH_REQUEST {}
+        HostPeer->>GuestPeer: REMATCH_ACCEPT { nextStartingTurn }
+        Note over Host,Guest: Fresh Boards Generated, Starter Alternated
+    end
 ```
 
-#### Screen State Machine
-1. **`lobby`**: Player nickname input, "Create 2-Player Room", "Join Friend's Room", and "Play Solo vs Smart Bot".
-2. **`waiting`**: Displayed to the Host. Shows giant 4-digit code, shareable link, "Share Invite Link" (using `navigator.share()` with clipboard fallback), and pulsing connection radar.
-3. **`playing`**: Active game arena with turn indicators, B-I-N-G-O letters, 5x5 tactile grid, opponent line tracker, and board shuffle controls.
-4. **`gameover`**: Victory / Defeat / Simultaneous Tie modal with `canvas-confetti` fireworks, game statistics, and Rematch buttons.
+---
 
-#### Real-Time Packet Protocol (`conn.send(data)`)
-| Packet Type | Payload | Sender | Purpose |
-| :--- | :--- | :--- | :--- |
-| `HELLO` | `{ name }` | Guest | Initiates handshake upon connecting to Host. |
-| `HELLO_ACK` | `{ name, turn }` | Host | Acknowledges handshake, syncs Host's name, sets Host first turn. |
-| `CALL_NUMBER` | `{ number, nextTurn, isClaimingWin, senderName, linesCount }` | Active Turn Player | Broadcasts selected number, passes turn, and updates line progress. |
-| `LINE_UPDATE` | `{ linesCount }` | Any | Syncs live BINGO line count for real-time progress bar. |
-| `CLAIM_WIN` | `{ winnerName, senderName }` | Winner | Broadcasts immediate victory when 5 lines are reached. |
-| `CLAIM_TIE` | `{}` | Local | Broadcasts simultaneous tie when both players hit 5 lines on the same call. |
-| `REMATCH_REQUEST`| `{}` | Player | Informs opponent of rematch request ("Waiting for opponent..."). |
-| `REMATCH_ACCEPT` | `{ nextStartingTurn }` | Opponent | Starts fresh round with alternating starter without disconnecting. |
-| `LEAVE` | `{}` | Any | Notifies peer that player returned to lobby and closes connection cleanly. |
+## 📱 Mobile-First iOS Safari Ergonomics
 
-#### Edge-Case Handling
-* **URL Auto-Join**: On mount, parses `?room=XXXX`. Automatically fills the 4-digit code and highlights the Join CTA so invited friends can join in a single tap.
-* **Simultaneous Wins**: If Player A calls a number that completes 5 lines on Player A's board *and* also completes 5 lines on Player B's board, the engine triggers a **Simultaneous Tie** with confetti and fanfare on both devices.
-* **Pre-Game Setup Phase**: Players can tap "Shuffle My Board" as many times as they want before the first number is called. As soon as `calledNumbers.length > 0`, the board layout locks permanently.
-* **Connection Lifecycle**: Full cleanup on unmount or return to lobby (`peer.destroy()`, `conn.close()`).
+* **Native PWA Ready**: Includes meta tags for full-screen display (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style: black-translucent`).
+* **Viewport Lock**: Prevents pull-to-refresh, accidental bounce/elastic scrolling, and page zooming using `touch-action: manipulation;` and fixed positioning.
+* **No Text Selection or Callouts**: Configured with `-webkit-touch-callout: none;` and `-webkit-user-select: none;`.
+* **Zero Tap Gray Boxes**: Stripped default mobile highlight styling via `-webkit-tap-highlight-color: transparent;`.
+* **Tabular Figures**: Utilizes `font-variant-numeric: tabular-nums` to eliminate number alignment jitter during gameplay.
+* **Safe-Area Insets**: Proper padding supporting iPhone Dynamic Island, top notch, and home indicator bar.
 
 ---
 
-## 🚀 Getting Started & Running Locally
+## 📖 Step-by-Step Usage Guide
+
+### A. How to Host a Multiplayer Game
+1. Visit [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app).
+2. Enter your nickname.
+3. Tap **"Create 2-Player Room"**.
+4. A 4-digit room code is generated and displayed on the Waiting Room screen.
+5. Tap **"Share Invite Link"** to send the direct link to a friend via iMessage/WhatsApp, or tap **"Copy Shareable URL"**.
+
+### B. How to Join a Multiplayer Game
+* **Via Invite Link**: Open the shared link (e.g., `https://bingo-web-app-nine.vercel.app/?room=1234`). The room code is automatically detected and populated. Tap **"Join"** to connect instantly.
+* **Via 4-Digit Code**: On the lobby screen, type the 4-digit code provided by the host and tap **"Join"**.
+
+### C. How to Install as an iOS Home-Screen App (PWA)
+1. Open [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app) in **Safari** on your iPhone.
+2. Tap the **Share** button (box with an upward arrow) in the bottom toolbar.
+3. Scroll down and tap **"Add to Home Screen"**.
+4. Confirm by tapping **"Add"** in the top right.
+5. Launch **BINGO // 25** directly from your Home Screen for a clean, full-screen standalone app experience without browser address bars!
+
+---
+
+## 💻 Local Development & Deployment
 
 ### Prerequisites
-* **Node.js**: v18.0.0 or higher
-* **npm**: v9.0.0 or higher
+* **Node.js**: `v18.0.0` or higher
+* **npm**: `v9.0.0` or higher
 
-### 1. Installation
-Clone or navigate to the project directory and install the packages:
+### Local Setup
 ```bash
+# Clone or navigate to the project directory
+git clone https://github.com/your-username/bingo-web-app.git
+cd bingo-web-app
+
+# Install dependencies
 npm install
-```
 
-### 2. Run Local Development Server
-Launch the Vite dev server with network host exposure:
-```bash
+# Start development server with LAN host exposure
 npm run dev -- --host
 ```
-The terminal will display:
-* **Local**: `http://localhost:5173/`
-* **Network**: `http://<YOUR_LAN_IP>:5173/`
 
-### 3. Testing on Mobile Devices
-1. Ensure your iPhone / Android and your computer are connected to the same Wi-Fi network.
-2. Open Safari / Chrome on your phone and browse to `http://<YOUR_LAN_IP>:5173/`.
-3. Tap **"Create 2-Player Room"** on Phone A.
-4. Tap **"Share Invite Link"** or scan/enter the 4-digit room code on Phone B.
-5. Both phones connect directly via WebRTC and start playing in real time!
-
-### 4. Production Build
-Verify compilation and produce optimized static assets:
+### Production Build & Preview
 ```bash
+# Compile and optimize for production
 npm run build
-```
-Preview the production build locally:
-```bash
+
+# Preview production build locally
 npm run preview
 ```
 
----
-
-## 📱 iOS Safari Optimization Best Practices Included
-
-* **No Elastic Bounce / Rubber-Banding**: Body position fixed with `100dvh` prevents content dragging.
-* **No Accidental Double-Tap Zoom**: `touch-action: manipulation;` and `user-scalable=no`.
-* **No Callout Magnifiers**: `-webkit-touch-callout: none;` and `-webkit-user-select: none;`.
-* **Zero Tap Highlight Grey Boxes**: `-webkit-tap-highlight-color: transparent;`.
-* **Tabular Numerals**: Numbers 1–25 rendered with `font-variant-numeric: tabular-nums` to prevent layout jittering when numbers are called.
-* **Safe-Area Insets**: Proper padding preserving space for dynamic island, notch, and home bar.
+### Deploying to Vercel
+This project deploys seamlessly as a static Vite application on Vercel:
+```bash
+npm install -g vercel
+vercel
+```
+Or connect the repository directly in the [Vercel Dashboard](https://vercel.com) with standard Vite presets (`dist` build output, `npm run build` command).
 
 ---
 
 ## 📄 License
-MIT License. Built for zero-backend, high-performance web gaming.
+This project is open-source under the [MIT License](LICENSE).
