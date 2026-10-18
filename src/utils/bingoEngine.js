@@ -22,6 +22,21 @@ export const WIN_LINES = [
   [4, 8, 12, 16, 20]
 ];
 
+export const LINE_NAMES = [
+  'Row 1',
+  'Row 2',
+  'Row 3',
+  'Row 4',
+  'Row 5',
+  'Column 1',
+  'Column 2',
+  'Column 3',
+  'Column 4',
+  'Column 5',
+  'Diagonal ↘',
+  'Diagonal ↙'
+];
+
 /**
  * Generates an array of numbers 1..25 shuffled via Fisher-Yates algorithm
  */
@@ -42,11 +57,16 @@ export function generateBoard() {
  *
  * @param {number[]} board - Array of 25 numbers
  * @param {number[]|Set<number>} calledNumbers - Numbers called in the game so far
- * @returns {{ completedLinesCount: number, winningTileIndices: Set<number>, completedLineIds: number[] }}
+ * @returns {{ completedLinesCount: number, winningTileIndices: Set<number>, completedLineIds: number[], completedLineNames: string[] }}
  */
 export function evaluateBoard(board, calledNumbers) {
   if (!board || board.length !== 25) {
-    return { completedLinesCount: 0, winningTileIndices: new Set(), completedLineIds: [] };
+    return {
+      completedLinesCount: 0,
+      winningTileIndices: new Set(),
+      completedLineIds: [],
+      completedLineNames: []
+    };
   }
 
   const calledSet = calledNumbers instanceof Set ? calledNumbers : new Set(calledNumbers || []);
@@ -68,7 +88,8 @@ export function evaluateBoard(board, calledNumbers) {
   return {
     completedLinesCount: completedLineIds.length,
     winningTileIndices,
-    completedLineIds
+    completedLineIds,
+    completedLineNames: completedLineIds.map((id) => LINE_NAMES[id])
   };
 }
 

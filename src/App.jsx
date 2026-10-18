@@ -29,7 +29,7 @@ import {
   Send,
   Download
 } from 'lucide-react';
-import { generateBoard, evaluateBoard, getBestBotMove } from './utils/bingoEngine';
+import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES } from './utils/bingoEngine';
 import {
   playTapSound,
   playOpponentTapSound,
@@ -170,14 +170,41 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimeoutRef = useRef(null);
 
-  // WebRTC refs
+  // WebRTC & Line History Refs
   const peerRef = useRef(null);
   const connRef = useRef(null);
   const prevCompletedLinesRef = useRef(0);
+  const prevCompletedLineIdsRef = useRef([]);
   const prevOpponentLinesCountRef = useRef(0);
+  const prevBotCompletedLineIdsRef = useRef([]);
+
+  // Stale-closure prevention refs for WebRTC listeners and timers
+  const boardRef = useRef(board);
+  const botBoardRef = useRef(botBoard);
+  const calledNumbersRef = useRef(calledNumbers);
+  const playerNameRef = useRef(playerName);
+  const opponentNameRef = useRef(opponentName);
+  const isDateNightRef = useRef(isDateNight);
+  const localScoreRef = useRef(localScore);
+  const opponentScoreRef = useRef(opponentScore);
+  const seriesLengthRef = useRef(seriesLength);
+  const activeWagerRef = useRef(activeWager);
+  const currentRoundRef = useRef(currentRound);
+
+  useEffect(() => { boardRef.current = board; }, [board]);
+  useEffect(() => { botBoardRef.current = botBoard; }, [botBoard]);
+  useEffect(() => { calledNumbersRef.current = calledNumbers; }, [calledNumbers]);
+  useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
+  useEffect(() => { opponentNameRef.current = opponentName; }, [opponentName]);
+  useEffect(() => { isDateNightRef.current = isDateNight; }, [isDateNight]);
+  useEffect(() => { localScoreRef.current = localScore; }, [localScore]);
+  useEffect(() => { opponentScoreRef.current = opponentScore; }, [opponentScore]);
+  useEffect(() => { seriesLengthRef.current = seriesLength; }, [seriesLength]);
+  useEffect(() => { activeWagerRef.current = activeWager; }, [activeWager]);
+  useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
 
   // Evaluation of current board
-  const { completedLinesCount, winningTileIndices } = evaluateBoard(board, calledNumbers);
+  const { completedLinesCount, winningTileIndices, completedLineIds, completedLineNames } = evaluateBoard(board, calledNumbers);
   const targetWins = getTargetWins(seriesLength);
 
   // Save stats to localStorage
@@ -326,16 +353,29 @@ export default function App() {
         playLineCompleteSound();
       }
 
+      // Identify newly completed line(s)
+      const newlyCompletedIds = (completedLineIds || []).filter(
+        (id) => !prevCompletedLineIdsRef.current.includes(id)
+      );
+      const lineNamesStr =
+        newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
+
       const title =
-        completedLinesCount === 4
-          ? '🚨 4 LINES DOWN! ONE AWAY FROM BINGO!'
+        completedLinesCount >= 5
+          ? isDateNight
+            ? '🏆 BINGO! YOU CLAIMED 5 LINES! ❤️'
+            : '🏆 BINGO! YOU COMPLETED 5 LINES!'
+          : completedLinesCount === 4
+          ? `🚨 4 LINES DOWN! Claimed ${lineNamesStr}!`
           : isDateNight
-          ? `❤️ You claimed a line! (${completedLinesCount}/5)`
-          : `✨ You completed a line! (${completedLinesCount}/5)`;
+          ? `❤️ You claimed ${lineNamesStr}! (${completedLinesCount}/5)`
+          : `✨ You completed ${lineNamesStr}! (${completedLinesCount}/5)`;
 
       const subtitle =
-        completedLinesCount === 4
-          ? 'Hold your breath! 1 more line to win! 💓'
+        completedLinesCount >= 5
+          ? 'Victory is sealed! 🥂'
+          : completedLinesCount === 4
+          ? 'Hold your breath! 1 more line to BINGO! 💓'
           : isDateNight
           ? 'One step closer to victory, my love. 💕'
           : `You have completed ${completedLinesCount} of 5 lines.`;
@@ -344,7 +384,9 @@ export default function App() {
         title,
         subtitle,
         isOpponent: false,
-        count: completedLinesCount
+        count: completedLinesCount,
+        lineName: lineNamesStr,
+        senderName: playerName
       });
 
       // Broadcast LINE_COMPLETED packet immediately so partner's phone rings & shows alert
@@ -352,12 +394,14 @@ export default function App() {
         connRef.current.send({
           type: 'LINE_COMPLETED',
           linesCount: completedLinesCount,
-          senderName: playerName
+          senderName: playerName,
+          lineName: lineNamesStr
         });
       }
     }
     prevCompletedLinesRef.current = completedLinesCount;
-  }, [completedLinesCount, screen, isDateNight, playerName, triggerLineAlert]);
+    prevCompletedLineIdsRef.current = completedLineIds || [];
+  }, [completedLinesCount, completedLineIds, screen, isDateNight, playerName, triggerLineAlert]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -414,26 +458,36 @@ export default function App() {
   // Record a round win and evaluate series outcome
   const recordRoundResult = useCallback(
     (winnerRole, winnerDisplay) => {
-      let nextLocalScore = localScore;
-      let nextOpponentScore = opponentScore;
+      let nextLocalScore = localScoreRef.current;
+      let nextOpponentScore = opponentScoreRef.current;
 
       if (winnerRole === 'local') {
         nextLocalScore += 1;
+        localScoreRef.current = nextLocalScore;
         setLocalScore(nextLocalScore);
       } else if (winnerRole === 'opponent') {
         nextOpponentScore += 1;
+        opponentScoreRef.current = nextOpponentScore;
         setOpponentScore(nextOpponentScore);
       }
+
+      const curPlayerName = playerNameRef.current;
+      const curOpponentName = opponentNameRef.current;
+      const curIsDateNight = isDateNightRef.current;
+      const curSeriesLength = seriesLengthRef.current;
+      const curActiveWager = activeWagerRef.current;
+      const curCurrentRound = currentRoundRef.current;
+      const curTargetWins = getTargetWins(curSeriesLength);
 
       // Identify winner by name for lifetime Yugi vs Renia tally
       const winnerIsYugi =
         winnerDisplay.includes('Yugi') ||
-        (winnerRole === 'local' && playerName === 'Yugi') ||
-        (winnerRole === 'opponent' && opponentName.includes('Yugi'));
+        (winnerRole === 'local' && curPlayerName === 'Yugi') ||
+        (winnerRole === 'opponent' && curOpponentName.includes('Yugi'));
       const winnerIsRenia =
         winnerDisplay.includes('Renia') ||
-        (winnerRole === 'local' && playerName === 'Renia') ||
-        (winnerRole === 'opponent' && opponentName.includes('Renia'));
+        (winnerRole === 'local' && curPlayerName === 'Renia') ||
+        (winnerRole === 'opponent' && curOpponentName.includes('Renia'));
 
       // Update rounds in persistent stats
       setStats((prev) => {
@@ -462,12 +516,12 @@ export default function App() {
       });
 
       // Check for Series Win
-      const localClenched = nextLocalScore >= targetWins;
-      const opponentClenched = nextOpponentScore >= targetWins;
+      const localClenched = nextLocalScore >= curTargetWins;
+      const opponentClenched = nextOpponentScore >= curTargetWins;
 
       if (localClenched || opponentClenched) {
         const seriesWinner = localClenched ? 'local' : 'opponent';
-        const seriesWinnerName = localClenched ? playerName : opponentName;
+        const seriesWinnerName = localClenched ? curPlayerName : curOpponentName;
 
         const seriesVictoryQuotes = [
           `${seriesWinnerName} is the undisputed Date Night Queen! 👑💖`,
@@ -487,10 +541,10 @@ export default function App() {
           winner: seriesWinner,
           name: seriesWinnerName,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
-          wager: activeWager,
-          reason: isDateNight
+          wager: curActiveWager,
+          reason: curIsDateNight
             ? romanticSeriesReason
-            : `${seriesWinnerName} won the Best of ${seriesLength} Series!`
+            : `${seriesWinnerName} won the Best of ${curSeriesLength} Series!`
         });
 
         // Determine if Yugi or Renia clinched the series for named stats
@@ -553,11 +607,11 @@ export default function App() {
         ];
 
         let roundReason = `${winnerDisplay} completed 5 lines!`;
-        if (isDateNight) {
+        if (curIsDateNight) {
           if (winnerRole === 'tie') {
-            roundReason = tieReasons[currentRound % tieReasons.length];
+            roundReason = tieReasons[curCurrentRound % tieReasons.length];
           } else {
-            roundReason = roundWinQuotes[currentRound % roundWinQuotes.length];
+            roundReason = roundWinQuotes[curCurrentRound % roundWinQuotes.length];
           }
         }
 
@@ -657,28 +711,35 @@ export default function App() {
           const newCount = data.linesCount || 0;
           if (newCount > prevOpponentLinesCountRef.current) {
             triggerHaptic([35, 50]);
-            if (isDateNight) {
+            if (isDateNightRef.current) {
               playRomanticChime();
             } else {
               playLineCompleteSound();
             }
 
-            const sender = data.senderName || opponentName;
+            const sender = data.senderName || opponentNameRef.current;
+            const lineClaimedText = data.lineName ? ` ${data.lineName}` : ' a line';
             const title =
-              newCount === 4
+              newCount >= 5
+                ? `🏆 BINGO! ${sender.toUpperCase()} WON THE ROUND!`
+                : newCount === 4
                 ? `🚨 ${sender} HAS 4 LINES!`
-                : `${isDateNight ? '💕' : '✨'} ${sender} completed a line! (${newCount}/5)`;
+                : `${isDateNightRef.current ? '💕' : '✨'} ${sender} claimed${lineClaimedText}! (Opponent: ${newCount}/5)`;
 
             const subtitle =
-              newCount === 4
+              newCount >= 5
+                ? `${sender} completed 5 lines on their board!`
+                : newCount === 4
                 ? 'ONE AWAY FROM BINGO! Watch out! 💓'
-                : `${sender} just claimed another line on their board.`;
+                : `${sender} just claimed${lineClaimedText} on their board.`;
 
             triggerLineAlert({
               title,
               subtitle,
               isOpponent: true,
-              count: newCount
+              count: newCount,
+              lineName: data.lineName,
+              senderName: sender
             });
 
             setOpponentLinesCount(newCount);
@@ -690,6 +751,7 @@ export default function App() {
         case 'LINE_UPDATE': {
           if (typeof data.linesCount === 'number') {
             setOpponentLinesCount(data.linesCount);
+            prevOpponentLinesCountRef.current = data.linesCount;
           }
           break;
         }
@@ -700,37 +762,43 @@ export default function App() {
           playOpponentTapSound();
           triggerHaptic([10]);
 
-          setCalledNumbers((prev) => {
-            if (prev.includes(calledNum)) return prev;
-            const updated = [...prev, calledNum];
+          const currentCalled = calledNumbersRef.current;
+          if (currentCalled.includes(calledNum)) {
+            setTurn(data.nextTurn);
+            break;
+          }
 
-            // Evaluate local board with the new number
-            const localEval = evaluateBoard(board, updated);
+          const updatedCalled = [...currentCalled, calledNum];
+          calledNumbersRef.current = updatedCalled;
+          setCalledNumbers(updatedCalled);
 
-            // Check for simultaneous win
-            if (data.isClaimingWin && localEval.completedLinesCount >= 5) {
-              recordRoundResult('tie', 'Both Players');
-              conn.send({ type: 'CLAIM_TIE' });
-              return updated;
-            }
+          // Evaluate local board with current live board
+          const localEval = evaluateBoard(boardRef.current, updatedCalled);
 
-            if (data.isClaimingWin) {
-              recordRoundResult('opponent', data.senderName || opponentName);
-              return updated;
-            }
+          // Check for simultaneous win
+          if (data.isClaimingWin && localEval.completedLinesCount >= 5) {
+            recordRoundResult('tie', 'Both Players');
+            conn.send({ type: 'CLAIM_TIE' });
+            setTurn(data.nextTurn);
+            break;
+          }
 
-            if (localEval.completedLinesCount >= 5) {
-              recordRoundResult('local', playerName);
-              conn.send({
-                type: 'CLAIM_WIN',
-                winnerName: playerName,
-                senderName: playerName
-              });
-              return updated;
-            }
+          if (data.isClaimingWin) {
+            recordRoundResult('opponent', data.senderName || opponentNameRef.current);
+            setTurn(data.nextTurn);
+            break;
+          }
 
-            return updated;
-          });
+          if (localEval.completedLinesCount >= 5) {
+            recordRoundResult('local', playerNameRef.current);
+            conn.send({
+              type: 'CLAIM_WIN',
+              winnerName: playerNameRef.current,
+              senderName: playerNameRef.current
+            });
+            setTurn(data.nextTurn);
+            break;
+          }
 
           // Check if opponent completed a new line in this turn
           if (typeof data.linesCount === 'number') {
@@ -739,26 +807,29 @@ export default function App() {
               !data.isClaimingWin
             ) {
               triggerHaptic([35, 50]);
-              if (isDateNight) {
+              if (isDateNightRef.current) {
                 playRomanticChime();
               } else {
                 playLineCompleteSound();
               }
-              const sender = data.senderName || opponentName;
+              const sender = data.senderName || opponentNameRef.current;
+              const lineClaimedText = data.lineName ? ` ${data.lineName}` : ' a line';
               const title =
                 data.linesCount === 4
                   ? `🚨 ${sender} HAS 4 LINES!`
-                  : `${isDateNight ? '💕' : '✨'} ${sender} completed a line! (${data.linesCount}/5)`;
+                  : `${isDateNightRef.current ? '💕' : '✨'} ${sender} claimed${lineClaimedText}! (Opponent: ${data.linesCount}/5)`;
               const subtitle =
                 data.linesCount === 4
                   ? 'ONE AWAY FROM BINGO! Watch out! 💓'
-                  : `${sender} just claimed another line on their board.`;
+                  : `${sender} just claimed${lineClaimedText} on their board.`;
 
               triggerLineAlert({
                 title,
                 subtitle,
                 isOpponent: true,
-                count: data.linesCount
+                count: data.linesCount,
+                lineName: data.lineName,
+                senderName: sender
               });
             }
             prevOpponentLinesCountRef.current = data.linesCount;
@@ -821,19 +892,29 @@ export default function App() {
   };
 
   // Helper to advance to the next round in the series
+  // Helper to advance to the next round in the series
   const startNextRound = (startingTurn, roundNum) => {
-    setBoard(generateBoard());
-    setBotBoard(generateBoard());
+    const freshBoard = generateBoard();
+    const freshBotBoard = generateBoard();
+    setBoard(freshBoard);
+    boardRef.current = freshBoard;
+    setBotBoard(freshBotBoard);
+    botBoardRef.current = freshBotBoard;
     setCalledNumbers([]);
+    calledNumbersRef.current = [];
     setLastCalled(null);
     setRoundWinnerInfo(null);
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevCompletedLineIdsRef.current = [];
     prevOpponentLinesCountRef.current = 0;
+    prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
-    setCurrentRound(roundNum || currentRound + 1);
+    const nextRound = roundNum || currentRoundRef.current + 1;
+    setCurrentRound(nextRound);
+    currentRoundRef.current = nextRound;
     setScreen('playing');
   };
 
@@ -861,20 +942,30 @@ export default function App() {
 
   // Reset series for rematch
   const startNewSeries = (startingTurn) => {
-    setBoard(generateBoard());
-    setBotBoard(generateBoard());
+    const freshBoard = generateBoard();
+    const freshBotBoard = generateBoard();
+    setBoard(freshBoard);
+    boardRef.current = freshBoard;
+    setBotBoard(freshBotBoard);
+    botBoardRef.current = freshBotBoard;
     setCalledNumbers([]);
+    calledNumbersRef.current = [];
     setLastCalled(null);
     setRoundWinnerInfo(null);
     setSeriesWinnerInfo(null);
     setShowPolaroidModal(false);
     setRematchStatus('none');
     setLocalScore(0);
+    localScoreRef.current = 0;
     setOpponentScore(0);
+    opponentScoreRef.current = 0;
     setCurrentRound(1);
+    currentRoundRef.current = 1;
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevCompletedLineIdsRef.current = [];
     prevOpponentLinesCountRef.current = 0;
+    prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
@@ -980,20 +1071,30 @@ export default function App() {
       : 'Smart Bot (AI)';
 
     setOpponentName(soloOpponentName);
-    setBoard(generateBoard());
-    setBotBoard(generateBoard());
+    const freshBoard = generateBoard();
+    const freshBotBoard = generateBoard();
+    setBoard(freshBoard);
+    boardRef.current = freshBoard;
+    setBotBoard(freshBotBoard);
+    botBoardRef.current = freshBotBoard;
     setCalledNumbers([]);
+    calledNumbersRef.current = [];
     setLastCalled(null);
     setRoundWinnerInfo(null);
     setSeriesWinnerInfo(null);
     setShowPolaroidModal(false);
     setRematchStatus('none');
     setLocalScore(0);
+    localScoreRef.current = 0;
     setOpponentScore(0);
+    opponentScoreRef.current = 0;
     setCurrentRound(1);
+    currentRoundRef.current = 1;
     setOpponentLinesCount(0);
     prevCompletedLinesRef.current = 0;
+    prevCompletedLineIdsRef.current = [];
     prevOpponentLinesCountRef.current = 0;
+    prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
     setTurn('player');
     setFirstTurnRole('player');
@@ -1057,7 +1158,9 @@ export default function App() {
     if (calledNumbers.length > 0) return;
     playShuffleSound();
     triggerHaptic([15, 25]);
-    setBoard(generateBoard());
+    const shuffled = generateBoard();
+    setBoard(shuffled);
+    boardRef.current = shuffled;
     showToast('Board reshuffled!');
   };
 
@@ -1084,59 +1187,78 @@ export default function App() {
     playTapSound();
     triggerHaptic([12]);
     const nextCalled = [...calledNumbers, number];
+    calledNumbersRef.current = nextCalled;
     setCalledNumbers(nextCalled);
     setLastCalled(number);
 
-    // Evaluate local board
-    const localEval = evaluateBoard(board, nextCalled);
+    // Evaluate local board with current live board
+    const localEval = evaluateBoard(boardRef.current, nextCalled);
     const hasWon = localEval.completedLinesCount >= 5;
+
+    // Determine newly completed line for local player
+    const newlyCompletedLocalIds = (localEval.completedLineIds || []).filter(
+      (id) => !prevCompletedLineIdsRef.current.includes(id)
+    );
+    const localLineName =
+      newlyCompletedLocalIds.map((id) => LINE_NAMES[id]).join(' & ') || '';
 
     if (role === 'solo') {
       // Solo Bot Mode
       if (hasWon) {
-        recordRoundResult('local', playerName);
+        recordRoundResult('local', playerNameRef.current);
         return;
       }
 
       // Check bot lines count
-      const botEval = evaluateBoard(botBoard, nextCalled);
-      if (
+      const botEval = evaluateBoard(botBoardRef.current, nextCalled);
+      const newlyCompletedBotIds = (botEval.completedLineIds || []).filter(
+        (id) => !prevBotCompletedLineIdsRef.current.includes(id)
+      );
+      const botLineName =
+        newlyCompletedBotIds.map((id) => LINE_NAMES[id]).join(' & ') || '';
+
+      const botDisplayName = isDateNight
+        ? playerName === 'Renia'
+          ? 'Yugi (AI 🥂)'
+          : 'Renia (AI 💕)'
+        : 'Smart Bot (AI)';
+
+      const playerGainedLine = localEval.completedLinesCount > prevCompletedLinesRef.current;
+      const botGainedLine =
         botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
-        botEval.completedLinesCount < 5
-      ) {
+        botEval.completedLinesCount < 5;
+
+      if (playerGainedLine && botGainedLine) {
+        triggerHaptic([35, 50, 35]);
+        if (isDateNight) playRomanticChime(); else playLineCompleteSound();
+        triggerLineAlert({
+          title: `⚡ DOUBLE LINE! You claimed ${localLineName} & ${botDisplayName} claimed ${botLineName}!`,
+          subtitle: `Both boards progressed! You: ${localEval.completedLinesCount}/5 • Opponent: ${botEval.completedLinesCount}/5`,
+          isOpponent: false,
+          count: localEval.completedLinesCount,
+          isDouble: true
+        });
+      } else if (botGainedLine) {
         triggerHaptic([35, 50]);
-        if (isDateNight) {
-          playRomanticChime();
-        } else {
-          playLineCompleteSound();
-        }
-        const botDisplayName = isDateNight
-          ? playerName === 'Renia'
-            ? 'Yugi (AI 🥂)'
-            : 'Renia (AI 💕)'
-          : 'Smart Bot';
+        if (isDateNight) playRomanticChime(); else playLineCompleteSound();
         triggerLineAlert({
           title:
             botEval.completedLinesCount === 4
               ? `🚨 ${botDisplayName} HAS 4 LINES!`
-              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} completed a line! (${botEval.completedLinesCount}/5)`,
-          subtitle:
-            botEval.completedLinesCount === 4
-              ? 'ONE AWAY FROM BINGO! Watch out! 💓'
-              : `${botDisplayName} just claimed another line!`,
+              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} claimed ${botLineName}! (Opponent: ${botEval.completedLinesCount}/5)`,
+          subtitle: `${botDisplayName} just claimed ${botLineName} on their hidden board!`,
           isOpponent: true,
-          count: botEval.completedLinesCount
+          count: botEval.completedLinesCount,
+          lineName: botLineName,
+          senderName: botDisplayName
         });
       }
+
       prevOpponentLinesCountRef.current = botEval.completedLinesCount;
+      prevBotCompletedLineIdsRef.current = botEval.completedLineIds || [];
       setOpponentLinesCount(botEval.completedLinesCount);
 
       if (botEval.completedLinesCount >= 5) {
-        const botDisplayName = isDateNight
-          ? playerName === 'Renia'
-            ? 'Yugi (AI 🥂)'
-            : 'Renia (AI 💕)'
-          : 'Smart Bot (AI)';
         recordRoundResult('opponent', botDisplayName);
         return;
       }
@@ -1148,20 +1270,21 @@ export default function App() {
       const nextTurnRole = role === 'host' ? 'guest' : 'host';
       setTurn(nextTurnRole);
 
-      // Send CALL_NUMBER to peer
+      // Send CALL_NUMBER to peer with line name
       if (connRef.current && connRef.current.open) {
         connRef.current.send({
           type: 'CALL_NUMBER',
           number,
           nextTurn: nextTurnRole,
           isClaimingWin: hasWon,
-          senderName: playerName,
-          linesCount: localEval.completedLinesCount
+          senderName: playerNameRef.current,
+          linesCount: localEval.completedLinesCount,
+          lineName: localLineName
         });
       }
 
       if (hasWon) {
-        recordRoundResult('local', playerName);
+        recordRoundResult('local', playerNameRef.current);
       }
     }
   };
@@ -1171,48 +1294,72 @@ export default function App() {
     if (role !== 'solo' || screen !== 'playing' || turn !== 'bot') return;
 
     const timer = setTimeout(() => {
-      const chosenNum = getBestBotMove(botBoard, calledNumbers);
+      const chosenNum = getBestBotMove(botBoardRef.current, calledNumbersRef.current);
       playOpponentTapSound();
       triggerHaptic([12]);
 
       setLastCalled(chosenNum);
-      const nextCalled = [...calledNumbers, chosenNum];
+      const nextCalled = [...calledNumbersRef.current, chosenNum];
+      calledNumbersRef.current = nextCalled;
       setCalledNumbers(nextCalled);
 
       // Evaluate both boards with bot's pick
-      const playerEval = evaluateBoard(board, nextCalled);
-      const botEval = evaluateBoard(botBoard, nextCalled);
+      const playerEval = evaluateBoard(boardRef.current, nextCalled);
+      const botEval = evaluateBoard(botBoardRef.current, nextCalled);
 
-      const botDisplayName = isDateNight
-        ? playerName === 'Renia'
+      const botDisplayName = isDateNightRef.current
+        ? playerNameRef.current === 'Renia'
           ? 'Yugi (AI 🥂)'
           : 'Renia (AI 💕)'
         : 'Smart Bot (AI)';
 
-      if (
+      const botGainedLine =
         botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
-        botEval.completedLinesCount < 5
-      ) {
+        botEval.completedLinesCount < 5;
+      const playerGainedLine =
+        playerEval.completedLinesCount > prevCompletedLinesRef.current &&
+        playerEval.completedLinesCount < 5;
+
+      const newlyCompletedBotIds = (botEval.completedLineIds || []).filter(
+        (id) => !prevBotCompletedLineIdsRef.current.includes(id)
+      );
+      const botLineName =
+        newlyCompletedBotIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
+
+      const newlyCompletedLocalIds = (playerEval.completedLineIds || []).filter(
+        (id) => !prevCompletedLineIdsRef.current.includes(id)
+      );
+      const playerLineName =
+        newlyCompletedLocalIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
+
+      if (playerGainedLine && botGainedLine) {
+        triggerHaptic([35, 50, 35]);
+        if (isDateNightRef.current) playRomanticChime(); else playLineCompleteSound();
+        triggerLineAlert({
+          title: `⚡ DOUBLE LINE! You claimed ${playerLineName} & ${botDisplayName} claimed ${botLineName}!`,
+          subtitle: `Both boards progressed! You: ${playerEval.completedLinesCount}/5 • Opponent: ${botEval.completedLinesCount}/5`,
+          isOpponent: false,
+          count: playerEval.completedLinesCount,
+          isDouble: true
+        });
+      } else if (botGainedLine) {
         triggerHaptic([35, 50]);
-        if (isDateNight) {
-          playRomanticChime();
-        } else {
-          playLineCompleteSound();
-        }
+        if (isDateNightRef.current) playRomanticChime(); else playLineCompleteSound();
         triggerLineAlert({
           title:
             botEval.completedLinesCount === 4
               ? `🚨 ${botDisplayName} HAS 4 LINES!`
-              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} completed a line! (${botEval.completedLinesCount}/5)`,
-          subtitle:
-            botEval.completedLinesCount === 4
-              ? 'ONE AWAY FROM BINGO! Watch out! 💓'
-              : `${botDisplayName} just claimed another line!`,
+              : `${isDateNightRef.current ? '💕' : '✨'} ${botDisplayName} claimed ${botLineName}! (Opponent: ${botEval.completedLinesCount}/5)`,
+          subtitle: `${botDisplayName} just claimed ${botLineName} on their hidden board!`,
           isOpponent: true,
-          count: botEval.completedLinesCount
+          count: botEval.completedLinesCount,
+          lineName: botLineName,
+          senderName: botDisplayName
         });
       }
+
       prevOpponentLinesCountRef.current = botEval.completedLinesCount;
+      prevBotCompletedLineIdsRef.current = botEval.completedLineIds || [];
       setOpponentLinesCount(botEval.completedLinesCount);
 
       const botWon = botEval.completedLinesCount >= 5;
@@ -1223,7 +1370,7 @@ export default function App() {
       } else if (botWon) {
         recordRoundResult('opponent', botDisplayName);
       } else if (playerWon) {
-        recordRoundResult('local', playerName);
+        recordRoundResult('local', playerNameRef.current);
       } else {
         setTurn('player');
       }
@@ -1234,11 +1381,6 @@ export default function App() {
     role,
     screen,
     turn,
-    botBoard,
-    calledNumbers,
-    board,
-    playerName,
-    isDateNight,
     recordRoundResult,
     triggerLineAlert
   ]);
@@ -2030,22 +2172,23 @@ export default function App() {
             </motion.div>
 
             {/* Opponent Lines Dots */}
-            <div className="flex items-center gap-1 text-[10px] text-slate-400">
-              <span>Lines:</span>
-              <div className="flex gap-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+              <span className="text-slate-400 font-bold">{opponentName}:</span>
+              <div className="flex gap-1 items-center">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <span
                     key={i}
-                    className={`w-2 h-2 rounded-full transition-colors ${
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${
                       i < opponentLinesCount
                         ? isDateNight
-                          ? 'bg-rose-400'
-                          : 'bg-amber-400'
-                        : 'bg-slate-700'
+                          ? 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]'
+                          : 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                        : 'bg-slate-700/80 border border-slate-600/40'
                     }`}
                   />
                 ))}
               </div>
+              <span className="font-mono text-[10px] text-slate-400">({opponentLinesCount}/5)</span>
             </div>
           </div>
 
@@ -2082,28 +2225,42 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                <div className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/10 shrink-0">
-                  {lineAlert.count}/5 Lines
+                <div
+                  className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full shrink-0 border ${
+                    lineAlert.isOpponent
+                      ? 'bg-indigo-900/60 text-indigo-200 border-indigo-400/40'
+                      : isDateNight
+                      ? 'bg-rose-900/70 text-amber-200 border-amber-400/50'
+                      : 'bg-emerald-900/60 text-emerald-200 border-emerald-400/40'
+                  }`}
+                >
+                  {lineAlert.isOpponent ? `${lineAlert.senderName || opponentName}: ` : 'You: '}
+                  {lineAlert.count}/5
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* B-I-N-G-O Header Badges */}
-          <div className="flex items-center justify-center gap-2 my-0.5">
-            {BINGO_LETTERS.map((letter, index) => {
-              const isActive = completedLinesCount > index;
-              return (
-                <motion.div
-                  key={letter}
-                  animate={isActive ? { scale: [1, 1.15, 1.06] } : { scale: 1 }}
-                  transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className={`bingo-badge ${isActive ? 'active' : 'inactive'}`}
-                >
-                  {letter}
-                </motion.div>
-              );
-            })}
+          <div className="flex flex-col items-center justify-center my-0.5">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">
+              Your B-I-N-G-O Lines ({completedLinesCount}/5)
+            </span>
+            <div className="flex items-center justify-center gap-2">
+              {BINGO_LETTERS.map((letter, index) => {
+                const isActive = completedLinesCount > index;
+                return (
+                  <motion.div
+                    key={letter}
+                    animate={isActive ? { scale: [1, 1.15, 1.06] } : { scale: 1 }}
+                    transition={{ duration: 0.35, ease: 'easeOut' }}
+                    className={`bingo-badge ${isActive ? 'active' : 'inactive'}`}
+                  >
+                    {letter}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
 
           {/* 5x5 Tactile Grid */}
@@ -2167,7 +2324,7 @@ export default function App() {
                 </span>
                 <span>•</span>
                 <span>
-                  Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
+                  Your Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
                 </span>
                 {lastCalled && (
                   <>
