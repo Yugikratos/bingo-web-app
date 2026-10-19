@@ -427,7 +427,7 @@ export default function App() {
 
   // Track completed lines to play chime & trigger prominent banner
   useEffect(() => {
-    if (completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
+    if (isBoardLocked && completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
       triggerHaptic([30, 45, 30]);
       if (isDateNight) {
         playRomanticChime();
@@ -483,7 +483,7 @@ export default function App() {
     }
     prevCompletedLinesRef.current = completedLinesCount;
     prevCompletedLineIdsRef.current = completedLineIds || [];
-  }, [completedLinesCount, completedLineIds, screen, isDateNight, playerName, triggerLineAlert]);
+  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -1296,7 +1296,7 @@ export default function App() {
 
   // Fill remaining (or all) empty slots randomly
   const handleFillRandom = () => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
+    if (isBoardLocked) return;
     playShuffleSound();
     triggerHaptic([15, 25]);
     setBoard((prevBoard) => {
@@ -1331,7 +1331,7 @@ export default function App() {
 
   // Clear Board in Setup Mode
   const handleClearBoard = () => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
+    if (isBoardLocked) return;
     playTapSound();
     triggerHaptic([15]);
     const emptyBoard = Array(25).fill(null);
@@ -1524,9 +1524,9 @@ export default function App() {
     }
   };
 
-  // Bot Turn Automation in Solo Mode (natural 650ms delay)
+  // Bot Turn Automation in Solo Mode (natural 650ms delay, waits for player to lock board)
   useEffect(() => {
-    if (role !== 'solo' || screen !== 'playing' || turn !== 'bot') return;
+    if (role !== 'solo' || screen !== 'playing' || turn !== 'bot' || !isBoardLocked) return;
 
     const timer = setTimeout(() => {
       const chosenNum = getBestBotMove(botBoardRef.current, calledNumbersRef.current);
@@ -1616,6 +1616,7 @@ export default function App() {
     role,
     screen,
     turn,
+    isBoardLocked,
     recordRoundResult,
     triggerLineAlert
   ]);
