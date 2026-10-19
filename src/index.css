@@ -200,6 +200,33 @@ html, body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 0 rgba(5, 7, 12, 0.95), 0 0 14px rgba(99, 102, 241, 0.35);
 }
 
+/* Empty Tile in Manual Setup Mode */
+.bingo-tile.empty {
+  background: rgba(15, 23, 42, 0.45) !important;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22) !important;
+  color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45) !important;
+  transform: none !important;
+  cursor: pointer;
+}
+
+.bingo-tile.empty:hover {
+  border-color: rgba(99, 102, 241, 0.6) !important;
+  background: rgba(99, 102, 241, 0.12) !important;
+}
+
+.date-night-mode .bingo-tile.empty {
+  background: rgba(30, 8, 22, 0.45) !important;
+  border: 1.5px dashed rgba(251, 113, 133, 0.3) !important;
+  color: rgba(251, 113, 133, 0.35) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45) !important;
+}
+
+.date-night-mode .bingo-tile.empty:hover {
+  border-color: rgba(251, 113, 133, 0.7) !important;
+  background: rgba(244, 63, 94, 0.14) !important;
+}
+
 /* Winning Line Tile: Radiant Emerald */
 .bingo-tile.winning {
   background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;

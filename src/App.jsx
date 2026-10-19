@@ -27,7 +27,8 @@ import {
   Camera,
   Smile,
   Send,
-  Download
+  Download,
+  Lock
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES } from './utils/bingoEngine';
 import {
@@ -132,6 +133,8 @@ export default function App() {
   // Game Board & Logic State
   const [board, setBoard] = useState(() => generateBoard());
   const [botBoard, setBotBoard] = useState(() => generateBoard());
+  const [setupMode, setSetupMode] = useState('auto'); // 'auto' | 'manual'
+  const [isBoardLocked, setIsBoardLocked] = useState(false);
   const [calledNumbers, setCalledNumbers] = useState([]);
   const [lastCalled, setLastCalled] = useState(null);
   const [turn, setTurn] = useState('host'); // 'host' | 'guest' | 'player' | 'bot'
@@ -181,6 +184,7 @@ export default function App() {
   // Stale-closure prevention refs for WebRTC listeners and timers
   const boardRef = useRef(board);
   const botBoardRef = useRef(botBoard);
+  const isBoardLockedRef = useRef(isBoardLocked);
   const calledNumbersRef = useRef(calledNumbers);
   const playerNameRef = useRef(playerName);
   const opponentNameRef = useRef(opponentName);
@@ -193,6 +197,7 @@ export default function App() {
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { botBoardRef.current = botBoard; }, [botBoard]);
+  useEffect(() => { isBoardLockedRef.current = isBoardLocked; }, [isBoardLocked]);
   useEffect(() => { calledNumbersRef.current = calledNumbers; }, [calledNumbers]);
   useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
   useEffect(() => { opponentNameRef.current = opponentName; }, [opponentName]);
@@ -206,6 +211,13 @@ export default function App() {
   // Evaluation of current board
   const { completedLinesCount, winningTileIndices, completedLineIds, completedLineNames } = evaluateBoard(board, calledNumbers);
   const targetWins = getTargetWins(seriesLength);
+
+  // Pre-Game Setup Derived State
+  const unplacedNumbers = Array.from({ length: 25 }, (_, i) => i + 1).filter(
+    (n) => !board.includes(n)
+  );
+  const placedCount = board.filter((n) => n !== null).length;
+  const isBoardFull = placedCount === 25;
 
   // Save stats to localStorage
   const saveStats = useCallback((updatedStats) => {
@@ -621,7 +633,7 @@ export default function App() {
           reason: roundReason,
           localScore: nextLocalScore,
           opponentScore: nextOpponentScore,
-          roundNum: currentRound
+          roundNum: curCurrentRound
         });
         setScreen('round_over');
         playWinFanfare();
@@ -653,29 +665,34 @@ export default function App() {
           if (data.isDateNight) {
             setIsDateNight(true);
           }
-          if (data.wager) {
-            setSelectedWager(data.wager);
-          }
+          // Do NOT overwrite host's room wager with guest's default!
           conn.send({
             type: 'HELLO_ACK',
-            name: playerName,
+            name: playerNameRef.current,
             turn: 'host',
-            seriesLength,
-            isDateNight,
-            wager: activeWager
+            seriesLength: seriesLengthRef.current,
+            isDateNight: isDateNightRef.current,
+            wager: activeWagerRef.current
           });
           setScreen('playing');
           setRole('host');
           setTurn('host');
           setFirstTurnRole('host');
           setLocalScore(0);
+          localScoreRef.current = 0;
           setOpponentScore(0);
+          opponentScoreRef.current = 0;
           setCurrentRound(1);
+          currentRoundRef.current = 1;
+          setIsBoardLocked(false);
+          setSetupMode('auto');
           prevCompletedLinesRef.current = 0;
+          prevCompletedLineIdsRef.current = [];
           prevOpponentLinesCountRef.current = 0;
+          prevBotCompletedLineIdsRef.current = [];
           setLineAlert(null);
           showToast(
-            `${data.name || 'Friend'} joined! Best of ${seriesLength} for ${activeWager}`
+            `${data.name || 'Friend'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
           );
           break;
         }
@@ -689,10 +706,17 @@ export default function App() {
           setTurn(data.turn || 'host');
           setFirstTurnRole(data.turn || 'host');
           setLocalScore(0);
+          localScoreRef.current = 0;
           setOpponentScore(0);
+          opponentScoreRef.current = 0;
           setCurrentRound(1);
+          currentRoundRef.current = 1;
+          setIsBoardLocked(false);
+          setSetupMode('auto');
           prevCompletedLinesRef.current = 0;
+          prevCompletedLineIdsRef.current = [];
           prevOpponentLinesCountRef.current = 0;
+          prevBotCompletedLineIdsRef.current = [];
           setLineAlert(null);
           showToast(`Connected with ${data.name || 'Friend'}! 💕`);
           break;
@@ -892,7 +916,6 @@ export default function App() {
   };
 
   // Helper to advance to the next round in the series
-  // Helper to advance to the next round in the series
   const startNextRound = (startingTurn, roundNum) => {
     const freshBoard = generateBoard();
     const freshBotBoard = generateBoard();
@@ -900,6 +923,9 @@ export default function App() {
     boardRef.current = freshBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
+    setIsBoardLocked(false);
+    isBoardLockedRef.current = false;
+    setSetupMode('auto');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -948,6 +974,9 @@ export default function App() {
     boardRef.current = freshBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
+    setIsBoardLocked(false);
+    isBoardLockedRef.current = false;
+    setSetupMode('auto');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -1077,6 +1106,9 @@ export default function App() {
     boardRef.current = freshBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
+    setIsBoardLocked(false);
+    isBoardLockedRef.current = false;
+    setSetupMode('auto');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -1155,7 +1187,7 @@ export default function App() {
 
   // Shuffle Board before first move
   const handleShuffleBoard = () => {
-    if (calledNumbers.length > 0) return;
+    if (calledNumbers.length > 0 || isBoardLocked) return;
     playShuffleSound();
     triggerHaptic([15, 25]);
     const shuffled = generateBoard();
@@ -1164,9 +1196,106 @@ export default function App() {
     showToast('Board reshuffled!');
   };
 
+  // Switch to Manual Fill Mode
+  const handleSwitchToManual = () => {
+    if (calledNumbers.length > 0 || isBoardLocked) return;
+    playTapSound();
+    triggerHaptic([15]);
+    setSetupMode('manual');
+    const emptyBoard = Array(25).fill(null);
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
+    showToast('Manual mode: Tap numbers below to place them!');
+  };
+
+  // Switch to Auto Fill Mode
+  const handleSwitchToAuto = () => {
+    if (calledNumbers.length > 0 || isBoardLocked) return;
+    playShuffleSound();
+    triggerHaptic([15, 25]);
+    setSetupMode('auto');
+    const fresh = generateBoard();
+    setBoard(fresh);
+    boardRef.current = fresh;
+    showToast('Switched to Auto Fill!');
+  };
+
+  // Clear Board in Manual Mode
+  const handleClearBoard = () => {
+    if (calledNumbers.length > 0 || isBoardLocked) return;
+    playTapSound();
+    triggerHaptic([15]);
+    const emptyBoard = Array(25).fill(null);
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
+    showToast('Board cleared!');
+  };
+
+  // Place number from tray to first available empty slot
+  const handlePlaceTrayNumber = (num) => {
+    if (calledNumbers.length > 0 || isBoardLocked) return;
+    const emptyIdx = board.findIndex((cell) => cell === null);
+    if (emptyIdx === -1) {
+      showToast('Board is full! Ready to lock.');
+      return;
+    }
+    playTapSound();
+    triggerHaptic([10]);
+    const newBoard = [...board];
+    newBoard[emptyIdx] = num;
+    setBoard(newBoard);
+    boardRef.current = newBoard;
+  };
+
+  // Remove number from tile in manual setup mode
+  const handleRemoveTileNumber = (index) => {
+    if (calledNumbers.length > 0 || isBoardLocked) return;
+    if (setupMode !== 'manual') return;
+    if (board[index] === null) return;
+    playTapSound();
+    triggerHaptic([10]);
+    const newBoard = [...board];
+    newBoard[index] = null;
+    setBoard(newBoard);
+    boardRef.current = newBoard;
+  };
+
+  // Lock board and ready up
+  const handleLockBoard = () => {
+    if (isBoardLocked) return;
+    const isFull = board.every((cell) => cell !== null);
+    if (!isFull) {
+      showToast('Please place all 25 numbers before locking!');
+      return;
+    }
+    if (isDateNight) {
+      playRomanticChime();
+    } else {
+      playLineCompleteSound();
+    }
+    triggerHaptic([20, 40]);
+    setIsBoardLocked(true);
+    isBoardLockedRef.current = true;
+    showToast('Board locked & ready! Game on! 🎯');
+  };
+
   // Human Player taps a number tile
-  const handleTileClick = (number) => {
+  const handleTileClick = (number, index) => {
     if (screen !== 'playing') return;
+
+    // Guardrail: if board is not locked yet, handle setup interactions only
+    if (!isBoardLocked) {
+      if (setupMode === 'manual') {
+        if (number !== null) {
+          handleRemoveTileNumber(index);
+        }
+      } else {
+        showToast('Lock your board when you are ready to play! 🔒');
+      }
+      return;
+    }
+
+    if (number === null) return;
 
     // Check turn
     const isMyTurn = role === 'solo' ? turn === 'player' : turn === role;
@@ -1439,6 +1568,12 @@ export default function App() {
     prevCompletedLinesRef.current = 0;
     prevOpponentLinesCountRef.current = 0;
     setLineAlert(null);
+    setIsBoardLocked(false);
+    isBoardLockedRef.current = false;
+    setSetupMode('auto');
+    const freshBoard = generateBoard();
+    setBoard(freshBoard);
+    boardRef.current = freshBoard;
   };
 
   // Status banner text tailored for Yugi and Renia
@@ -2266,22 +2401,29 @@ export default function App() {
           {/* 5x5 Tactile Grid */}
           <div className="bingo-grid my-auto">
             {board.map((number, index) => {
-              const isCalled = calledNumbers.includes(number);
-              const isWinning = winningTileIndices.has(index);
-              const isLast = lastCalled === number;
+              const isEmpty = number === null;
+              const isCalled = !isEmpty && calledNumbers.includes(number);
+              const isWinning = !isEmpty && winningTileIndices.has(index);
+              const isLast = !isEmpty && lastCalled === number;
 
               return (
                 <button
-                  key={number}
-                  disabled={isCalled || screen !== 'playing'}
-                  onClick={() => handleTileClick(number)}
+                  key={index}
+                  disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
+                  onClick={() => handleTileClick(number, index)}
                   className={`bingo-tile ${
-                    isWinning ? 'winning' : isCalled ? 'called' : 'uncalled'
+                    isEmpty
+                      ? 'empty'
+                      : isWinning
+                      ? 'winning'
+                      : isCalled
+                      ? 'called'
+                      : 'uncalled'
                   }`}
                 >
                   {/* Last Called Pulse Ring */}
                   {isLast && <div className="last-called-ring" />}
-                  <span>{number}</span>
+                  <span>{isEmpty ? '' : number}</span>
                 </button>
               );
             })}
@@ -2306,37 +2448,148 @@ export default function App() {
             </div>
           )}
 
-          {/* Pre-Game Shuffle Pill / Move Status */}
-          <div className="flex flex-col items-center justify-center min-h-[34px] my-0.5">
-            {calledNumbers.length === 0 ? (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={handleShuffleBoard}
-                className="px-4 py-1 rounded-full glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center gap-1.5 shadow-lg hover:bg-slate-800"
-              >
-                <Shuffle size={13} />
-                <span>Shuffle My Board</span>
-              </motion.button>
+          {/* Setup Control Panel / In-game Call Status */}
+          {!isBoardLocked ? (
+            setupMode === 'auto' ? (
+              <div className="w-full max-w-sm mx-auto p-2.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2 my-0.5">
+                <div className="flex items-center justify-between gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleShuffleBoard}
+                    className="flex-1 py-1.5 px-3 rounded-xl glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center justify-center gap-1.5 shadow hover:bg-slate-800"
+                  >
+                    <Shuffle size={13} />
+                    <span>Shuffle Again</span>
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSwitchToManual}
+                    className="flex-1 py-1.5 px-3 rounded-xl glass-button text-xs font-bold text-slate-200 border-slate-600/40 flex items-center justify-center gap-1.5 shadow hover:bg-slate-800"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Switch to Manual Fill</span>
+                  </motion.button>
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleLockBoard}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 border ${
+                    isDateNight
+                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/40'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/40'
+                  }`}
+                >
+                  <Lock size={14} />
+                  <span>Lock Board & Ready</span>
+                </motion.button>
+              </div>
             ) : (
-              <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400">
-                <span>
-                  Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
-                </span>
-                <span>•</span>
-                <span>
-                  Your Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
-                </span>
-                {lastCalled && (
-                  <>
-                    <span>•</span>
-                    <span>
-                      Last: <strong className="text-indigo-300">#{lastCalled}</strong>
+              <div className="w-full max-w-sm mx-auto p-2.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2 my-0.5">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                    <span className={isDateNight ? 'text-rose-400' : 'text-indigo-400'}>
+                      Manual Setup:
                     </span>
-                  </>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      ({placedCount}/25 placed)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleClearBoard}
+                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition"
+                    >
+                      Clear Board
+                    </button>
+                    <button
+                      onClick={handleSwitchToAuto}
+                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition"
+                    >
+                      Auto Fill
+                    </button>
+                  </div>
+                </div>
+
+                {/* Number Tray */}
+                {unplacedNumbers.length > 0 ? (
+                  <div className="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex flex-wrap gap-1.5 justify-center max-h-32 overflow-y-auto">
+                    {unplacedNumbers.map((num) => (
+                      <motion.button
+                        key={num}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => handlePlaceTrayNumber(num)}
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-all shadow-sm ${
+                          isDateNight
+                            ? 'bg-rose-950/60 hover:bg-rose-600 text-rose-100 border border-rose-500/30'
+                            : 'bg-slate-800 hover:bg-indigo-600 text-slate-100 border border-slate-700'
+                        }`}
+                      >
+                        {num}
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-2 text-center text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
+                    <Check size={14} />
+                    <span>All 25 numbers placed on your board!</span>
+                  </div>
+                )}
+
+                {/* Lock CTA when all 25 numbers placed */}
+                {isBoardFull ? (
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleLockBoard}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 border ${
+                      isDateNight
+                        ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/40 animate-pulse'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/40 animate-pulse'
+                    }`}
+                  >
+                    <Lock size={14} />
+                    <span>Lock Board & Ready</span>
+                  </motion.button>
+                ) : (
+                  <p className="text-[10px] text-center text-slate-400">
+                    Tap a number in the tray to place it. Tap a placed number to remove it.
+                  </p>
                 )}
               </div>
-            )}
-          </div>
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[34px] my-0.5">
+              {calledNumbers.length === 0 ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-md">
+                    <Lock size={12} className="text-emerald-400" />
+                    <span>
+                      Board Locked & Ready!{' '}
+                      {isLocalTurn ? 'Your turn to call!' : `Waiting for ${opponentName}...`}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400">
+                  <span>
+                    Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Your Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
+                  </span>
+                  {lastCalled && (
+                    <>
+                      <span>•</span>
+                      <span>
+                        Last: <strong className="text-indigo-300">#{lastCalled}</strong>
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -2403,18 +2656,25 @@ export default function App() {
               </div>
 
               {/* Next Round CTA */}
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                onClick={handleProceedToNextRound}
-                className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
-                  isDateNight
-                    ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30'
-                    : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/30 border-indigo-400/30'
-                }`}
-              >
-                <RefreshCw size={16} />
-                <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
-              </motion.button>
+              {role === 'guest' ? (
+                <div className="w-full py-3 px-4 rounded-2xl text-slate-300 font-bold text-xs bg-slate-800/80 border border-slate-700/60 flex items-center justify-center gap-2 cursor-not-allowed">
+                  <RefreshCw size={14} className="animate-spin text-slate-400" />
+                  <span>Waiting for Host to start next round...</span>
+                </div>
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleProceedToNextRound}
+                  className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                    isDateNight
+                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30'
+                      : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/30 border-indigo-400/30'
+                  }`}
+                >
+                  <RefreshCw size={16} />
+                  <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         )}
