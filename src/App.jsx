@@ -29,7 +29,8 @@ import {
   Send,
   Download,
   Lock,
-  ScrollText
+  ScrollText,
+  Gift
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES } from './utils/bingoEngine';
 import {
