@@ -145,10 +145,10 @@ export default function App() {
   // Audio mute state
   const [isMuted, setIsMuted] = useState(getSoundMuted());
 
-  // Game Board & Logic State
-  const [board, setBoard] = useState(() => generateBoard());
+  // Game Board & Logic State (Pre-game manual on-tap sequential fill by default)
+  const [board, setBoard] = useState(() => Array(25).fill(null));
   const [botBoard, setBotBoard] = useState(() => generateBoard());
-  const [setupMode, setSetupMode] = useState('auto'); // 'auto' | 'manual'
+  const [setupMode, setSetupMode] = useState('manual'); // 'manual' | 'auto'
   const [isBoardLocked, setIsBoardLocked] = useState(false);
   const [calledNumbers, setCalledNumbers] = useState([]);
   const [lastCalled, setLastCalled] = useState(null);
@@ -231,6 +231,12 @@ export default function App() {
   const unplacedNumbers = Array.from({ length: 25 }, (_, i) => i + 1).filter(
     (n) => !board.includes(n)
   );
+  const nextSequentialNumber = (() => {
+    for (let i = 1; i <= 25; i++) {
+      if (!board.includes(i)) return i;
+    }
+    return null;
+  })();
   const placedCount = board.filter((n) => n !== null).length;
   const isBoardFull = placedCount === 25;
 
@@ -779,8 +785,12 @@ export default function App() {
           opponentScoreRef.current = 0;
           setCurrentRound(1);
           currentRoundRef.current = 1;
+          const hostEmptyBoard = Array(25).fill(null);
+          setBoard(hostEmptyBoard);
+          boardRef.current = hostEmptyBoard;
           setIsBoardLocked(false);
-          setSetupMode('auto');
+          isBoardLockedRef.current = false;
+          setSetupMode('manual');
           prevCompletedLinesRef.current = 0;
           prevCompletedLineIdsRef.current = [];
           prevOpponentLinesCountRef.current = 0;
@@ -806,8 +816,12 @@ export default function App() {
           opponentScoreRef.current = 0;
           setCurrentRound(1);
           currentRoundRef.current = 1;
+          const guestEmptyBoard = Array(25).fill(null);
+          setBoard(guestEmptyBoard);
+          boardRef.current = guestEmptyBoard;
           setIsBoardLocked(false);
-          setSetupMode('auto');
+          isBoardLockedRef.current = false;
+          setSetupMode('manual');
           prevCompletedLinesRef.current = 0;
           prevCompletedLineIdsRef.current = [];
           prevOpponentLinesCountRef.current = 0;
@@ -1012,15 +1026,15 @@ export default function App() {
 
   // Helper to advance to the next round in the series
   const startNextRound = (startingTurn, roundNum) => {
-    const freshBoard = generateBoard();
+    const emptyBoard = Array(25).fill(null);
     const freshBotBoard = generateBoard();
-    setBoard(freshBoard);
-    boardRef.current = freshBoard;
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
     setIsBoardLocked(false);
     isBoardLockedRef.current = false;
-    setSetupMode('auto');
+    setSetupMode('manual');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -1063,15 +1077,15 @@ export default function App() {
 
   // Reset series for rematch
   const startNewSeries = (startingTurn) => {
-    const freshBoard = generateBoard();
+    const emptyBoard = Array(25).fill(null);
     const freshBotBoard = generateBoard();
-    setBoard(freshBoard);
-    boardRef.current = freshBoard;
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
     setIsBoardLocked(false);
     isBoardLockedRef.current = false;
-    setSetupMode('auto');
+    setSetupMode('manual');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -1195,15 +1209,15 @@ export default function App() {
       : 'Smart Bot (AI)';
 
     setOpponentName(soloOpponentName);
-    const freshBoard = generateBoard();
+    const emptyBoard = Array(25).fill(null);
     const freshBotBoard = generateBoard();
-    setBoard(freshBoard);
-    boardRef.current = freshBoard;
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
     setBotBoard(freshBotBoard);
     botBoardRef.current = freshBotBoard;
     setIsBoardLocked(false);
     isBoardLockedRef.current = false;
-    setSetupMode('auto');
+    setSetupMode('manual');
     setCalledNumbers([]);
     calledNumbersRef.current = [];
     setLastCalled(null);
@@ -1280,42 +1294,50 @@ export default function App() {
     }
   };
 
-  // Shuffle Board before first move
-  const handleShuffleBoard = () => {
+  // Fill remaining (or all) empty slots randomly
+  const handleFillRandom = () => {
     if (calledNumbers.length > 0 || isBoardLocked) return;
     playShuffleSound();
     triggerHaptic([15, 25]);
-    const shuffled = generateBoard();
-    setBoard(shuffled);
-    boardRef.current = shuffled;
-    showToast('Board reshuffled!');
+    const unplaced = Array.from({ length: 25 }, (_, i) => i + 1).filter((n) => !board.includes(n));
+    if (unplaced.length === 0) {
+      // If already full, reshuffle all 25 numbers
+      const fresh = generateBoard();
+      setBoard(fresh);
+      boardRef.current = fresh;
+      showToast('Board reshuffled with random numbers! 🎲');
+      return;
+    }
+    // Shuffle unplaced numbers using Fisher-Yates
+    const shuffledUnplaced = [...unplaced];
+    for (let i = shuffledUnplaced.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledUnplaced[i], shuffledUnplaced[j]] = [shuffledUnplaced[j], shuffledUnplaced[i]];
+    }
+    const newBoard = [...board];
+    let fillIdx = 0;
+    for (let i = 0; i < 25; i++) {
+      if (newBoard[i] === null && fillIdx < shuffledUnplaced.length) {
+        newBoard[i] = shuffledUnplaced[fillIdx++];
+      }
+    }
+    setBoard(newBoard);
+    boardRef.current = newBoard;
+    showToast('Filled empty slots randomly! 🎲');
   };
 
-  // Switch to Manual Fill Mode
-  const handleSwitchToManual = () => {
+  // Fill Board Sequentially (1 to 25 in order)
+  const handleFillSequential = () => {
     if (calledNumbers.length > 0 || isBoardLocked) return;
     playTapSound();
     triggerHaptic([15]);
-    setSetupMode('manual');
-    const emptyBoard = Array(25).fill(null);
-    setBoard(emptyBoard);
-    boardRef.current = emptyBoard;
-    showToast('Manual mode: Tap numbers below to place them!');
+    const seq = Array.from({ length: 25 }, (_, i) => i + 1);
+    setBoard(seq);
+    boardRef.current = seq;
+    showToast('Board filled 1 to 25! 🔢');
   };
 
-  // Switch to Auto Fill Mode
-  const handleSwitchToAuto = () => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
-    playShuffleSound();
-    triggerHaptic([15, 25]);
-    setSetupMode('auto');
-    const fresh = generateBoard();
-    setBoard(fresh);
-    boardRef.current = fresh;
-    showToast('Switched to Auto Fill!');
-  };
-
-  // Clear Board in Manual Mode
+  // Clear Board in Setup Mode
   const handleClearBoard = () => {
     if (calledNumbers.length > 0 || isBoardLocked) return;
     playTapSound();
@@ -1323,36 +1345,7 @@ export default function App() {
     const emptyBoard = Array(25).fill(null);
     setBoard(emptyBoard);
     boardRef.current = emptyBoard;
-    showToast('Board cleared!');
-  };
-
-  // Place number from tray to first available empty slot
-  const handlePlaceTrayNumber = (num) => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
-    const emptyIdx = board.findIndex((cell) => cell === null);
-    if (emptyIdx === -1) {
-      showToast('Board is full! Ready to lock.');
-      return;
-    }
-    playTapSound();
-    triggerHaptic([10]);
-    const newBoard = [...board];
-    newBoard[emptyIdx] = num;
-    setBoard(newBoard);
-    boardRef.current = newBoard;
-  };
-
-  // Remove number from tile in manual setup mode
-  const handleRemoveTileNumber = (index) => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
-    if (setupMode !== 'manual') return;
-    if (board[index] === null) return;
-    playTapSound();
-    triggerHaptic([10]);
-    const newBoard = [...board];
-    newBoard[index] = null;
-    setBoard(newBoard);
-    boardRef.current = newBoard;
+    showToast('Board cleared');
   };
 
   // Lock board and ready up
@@ -1360,7 +1353,7 @@ export default function App() {
     if (isBoardLocked) return;
     const isFull = board.every((cell) => cell !== null);
     if (!isFull) {
-      showToast('Please place all 25 numbers before locking!');
+      showToast('Please fill all 25 numbers before locking!');
       return;
     }
     if (isDateNight) {
@@ -1378,14 +1371,27 @@ export default function App() {
   const handleTileClick = (number, index) => {
     if (screen !== 'playing') return;
 
-    // Guardrail: if board is not locked yet, handle setup interactions only
+    // Guardrail: if board is not locked yet, handle on-tap sequential fill or remove
     if (!isBoardLocked) {
-      if (setupMode === 'manual') {
-        if (number !== null) {
-          handleRemoveTileNumber(index);
+      if (number === null) {
+        // Tapped empty box: place next sequential number into this box
+        if (nextSequentialNumber !== null) {
+          playTapSound();
+          triggerHaptic([12]);
+          const newBoard = [...board];
+          newBoard[index] = nextSequentialNumber;
+          setBoard(newBoard);
+          boardRef.current = newBoard;
         }
       } else {
-        showToast('Lock your board when you are ready to play! 🔒');
+        // Tapped placed number: remove it and return it to unplaced pool
+        playTapSound();
+        triggerHaptic([10]);
+        const newBoard = [...board];
+        newBoard[index] = null;
+        setBoard(newBoard);
+        boardRef.current = newBoard;
+        showToast(`Removed #${number}`);
       }
       return;
     }
@@ -1665,10 +1671,10 @@ export default function App() {
     setLineAlert(null);
     setIsBoardLocked(false);
     isBoardLockedRef.current = false;
-    setSetupMode('auto');
-    const freshBoard = generateBoard();
-    setBoard(freshBoard);
-    boardRef.current = freshBoard;
+    setSetupMode('manual');
+    const emptyBoard = Array(25).fill(null);
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
   };
 
   // Status banner text tailored for Yugi and Renia
@@ -1723,7 +1729,7 @@ export default function App() {
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col justify-between overflow-hidden text-[#F8FAFC] transition-colors duration-500 ${
+      className={`relative w-full min-h-screen flex flex-col justify-between overflow-x-hidden text-[#F8FAFC] transition-colors duration-500 ${
         isDateNight ? 'date-night-mode bg-[#12030C]' : 'bg-[#090A0F]'
       }`}
     >
@@ -1775,12 +1781,12 @@ export default function App() {
       {/* SCREEN 1: LOBBY */}
       {/* ================================================================ */}
       {screen === 'lobby' && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-4 py-3.5 max-w-md mx-auto overflow-y-auto">
+        <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-4 py-4 max-w-md mx-auto overflow-y-auto space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-lg ${
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg ${
                   isDateNight
                     ? 'bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/30'
                     : 'bg-gradient-to-tr from-indigo-500 to-indigo-700 shadow-indigo-500/30'
@@ -1789,10 +1795,10 @@ export default function App() {
                 {isDateNight ? '❤️' : '25'}
               </div>
               <div>
-                <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
                   BINGO{' '}
                   <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                    className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
                       isDateNight
                         ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                         : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
@@ -1801,25 +1807,25 @@ export default function App() {
                     {isDateNight ? 'DATE NIGHT' : 'SERIES PRO'}
                   </span>
                 </h1>
-                <p className="text-[10px] font-medium text-slate-400 tracking-wider">
+                <p className="text-xs font-semibold text-slate-400 tracking-wider">
                   {isDateNight ? 'YUGI & RENIA EDITION' : 'ZERO-BACKEND MULTIPLAYER'}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               {isDateNight && (
                 <button
                   onClick={() => {
                     setActiveStatsTab('ledger');
                     setShowStatsModal(true);
                   }}
-                  className="relative w-9 h-9 rounded-full glass-button flex items-center justify-center text-rose-300 hover:text-white"
+                  className="relative w-10 h-10 rounded-full glass-button flex items-center justify-center text-rose-300 hover:text-white"
                   title="Love Ledger & Wager Debts"
                 >
-                  <ScrollText size={16} />
+                  <ScrollText size={18} />
                   {pendingDebtsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center shadow-md animate-pulse">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-md animate-pulse">
                       {pendingDebtsCount}
                     </span>
                   )}
@@ -1830,46 +1836,46 @@ export default function App() {
                   setActiveStatsTab('stats');
                   setShowStatsModal(true);
                 }}
-                className="w-9 h-9 rounded-full glass-button flex items-center justify-center text-amber-300"
+                className="w-10 h-10 rounded-full glass-button flex items-center justify-center text-amber-300"
                 title="View Head-to-Head Stats"
               >
-                <Flame size={16} />
+                <Flame size={18} />
               </button>
               <button
                 onClick={handleToggleMute}
-                className="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300"
+                className="w-10 h-10 rounded-full glass-button flex items-center justify-center text-slate-300"
                 title="Toggle Sound"
               >
-                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             </div>
           </div>
 
           {/* Date Night Mode Toggle Pill */}
-          <div className="my-1.5">
+          <div className="my-1">
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleToggleDateNight}
-              className={`w-full p-2.5 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
+              className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
                 isDateNight
                   ? 'bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-amber-950/30 border-rose-500/40 shadow-rose-950/50'
                   : 'glass-card border-white/10 hover:border-white/20'
               }`}
             >
-              <div className="flex items-center gap-2.5 text-left">
+              <div className="flex items-center gap-3 text-left">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  className={`w-9 h-9 rounded-full flex items-center justify-center ${
                     isDateNight ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
                   }`}
                 >
-                  <Heart size={16} className={isDateNight ? 'fill-white' : ''} />
+                  <Heart size={18} className={isDateNight ? 'fill-white' : ''} />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
                     Date Night Mode (Yugi & Renia)
                     {isDateNight && <span className="text-rose-400 text-xs">✨ Active</span>}
                   </div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-xs text-slate-400">
                     Velvet rose surfaces, champagne gold & love banter
                   </div>
                 </div>
@@ -1893,26 +1899,26 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-1.5 p-2 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
+              className="mb-1 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
             >
-              <span className="text-[11px] font-semibold text-rose-300">Choose Player:</span>
+              <span className="text-xs font-semibold text-rose-300">Choose Player:</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleSelectPersona('Yugi')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                     playerName === 'Yugi'
                       ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                      : 'bg-slate-800/80 text-slate-300'
+                      : 'bg-slate-800/80 text-slate-300 hover:text-white'
                   }`}
                 >
                   <span>Yugi</span> 🥂
                 </button>
                 <button
                   onClick={() => handleSelectPersona('Renia')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                     playerName === 'Renia'
                       ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                      : 'bg-slate-800/80 text-slate-300'
+                      : 'bg-slate-800/80 text-slate-300 hover:text-white'
                   }`}
                 >
                   <span>Renia</span> 🌹
@@ -1926,15 +1932,15 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-2 p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
+              className="mb-2 p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-rose-300 flex items-center gap-1">
-                  <Heart size={12} className="text-rose-400 fill-rose-400" />
+                <span className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                  <Heart size={13} className="text-rose-400 fill-rose-400" />
                   <span>Yugi & Renia Lifetime Score</span>
                 </span>
-                <span className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
-                  <Flame size={12} className="text-amber-400 fill-amber-400" />
+                <span className="text-xs text-amber-300 font-bold flex items-center gap-1">
+                  <Flame size={13} className="text-amber-400 fill-amber-400" />
                   <span>
                     Streak:{' '}
                     {stats.streakHolder !== 'None'
@@ -1947,40 +1953,40 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2 text-center">
                 {/* Yugi Side */}
                 <div
-                  className={`p-2 rounded-xl border transition ${
+                  className={`p-2.5 rounded-xl border transition ${
                     playerName === 'Yugi'
                       ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
                       : 'bg-slate-900/60 border-slate-700/40'
                   }`}
                 >
-                  <div className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                  <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
                     <span>Yugi</span> 🥂
                   </div>
-                  <div className="text-xl font-black text-amber-400 font-mono leading-none my-1">
+                  <div className="text-2xl font-black text-amber-400 font-mono leading-none my-1">
                     {stats.yugiSeriesWon || 0}{' '}
-                    <span className="text-[10px] text-slate-400 font-sans font-bold">Series</span>
+                    <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
                   </div>
-                  <div className="text-[10px] text-slate-300">
+                  <div className="text-xs text-slate-300 font-medium">
                     {stats.yugiRoundsWon || 0} Rounds Won
                   </div>
                 </div>
 
                 {/* Renia Side */}
                 <div
-                  className={`p-2 rounded-xl border transition ${
+                  className={`p-2.5 rounded-xl border transition ${
                     playerName === 'Renia'
                       ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
                       : 'bg-slate-900/60 border-slate-700/40'
                   }`}
                 >
-                  <div className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                  <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
                     <span>Renia</span> 🌹
                   </div>
-                  <div className="text-xl font-black text-rose-300 font-mono leading-none my-1">
+                  <div className="text-2xl font-black text-rose-300 font-mono leading-none my-1">
                     {stats.reniaSeriesWon || 0}{' '}
-                    <span className="text-[10px] text-slate-400 font-sans font-bold">Series</span>
+                    <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
                   </div>
-                  <div className="text-[10px] text-slate-300">
+                  <div className="text-xs text-slate-300 font-medium">
                     {stats.reniaRoundsWon || 0} Rounds Won
                   </div>
                 </div>
@@ -1993,14 +1999,14 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mb-2 p-3 rounded-2xl glass-card border border-rose-500/40 space-y-2 shadow-lg"
+              className="mb-2 p-3.5 rounded-2xl glass-card border border-rose-500/40 space-y-2 shadow-lg"
             >
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
-                  <Gift size={12} className="text-amber-400" />
+                <label className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                  <Gift size={13} className="text-amber-400" />
                   <span>Date Night Wager (Loser's Penalty)</span>
                 </label>
-                <span className="text-[9px] text-amber-300 font-bold">Prize at stake</span>
+                <span className="text-xs text-amber-300 font-bold">Prize at stake</span>
               </div>
 
               <div className="relative flex items-center">
@@ -2010,30 +2016,30 @@ export default function App() {
                   value={customWager}
                   onChange={(e) => handleWagerChange(e.target.value)}
                   placeholder="Type wager here... (e.g. 15-min massage, cook dinner, kisses)"
-                  className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl pl-3 pr-8 py-2 text-xs font-semibold text-white placeholder-slate-400 outline-none transition shadow-inner"
+                  className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl pl-3.5 pr-8 py-2.5 text-sm font-semibold text-white placeholder-slate-400 outline-none transition shadow-inner"
                 />
                 {customWager && (
                   <button
                     type="button"
                     onClick={() => handleWagerChange('')}
-                    className="absolute right-2.5 w-4 h-4 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition"
+                    className="absolute right-2.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition"
                     title="Clear"
                   >
                     ×
                   </button>
                 )}
               </div>
-              <p className="text-[9.5px] text-slate-400">
+              <p className="text-xs text-slate-400">
                 Type any penalty or bet — winner takes all! 💕
               </p>
             </motion.div>
           )}
 
           {/* Name Input & Best-of Selector */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {/* Player Name Card */}
-            <div className="glass-card p-2.5 space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="glass-card p-3 space-y-1.5 rounded-2xl">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                 Your Player Name
               </label>
               <input
@@ -2042,18 +2048,18 @@ export default function App() {
                 value={playerName}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Enter name"
-                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-1.5 text-sm font-semibold text-white placeholder-slate-500 outline-none transition"
+                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3.5 py-2 text-base font-semibold text-white placeholder-slate-500 outline-none transition"
               />
             </div>
 
             {/* Best-of Series Selector */}
-            <div className="glass-card p-2.5 space-y-1.5">
+            <div className="glass-card p-3 space-y-2 rounded-2xl">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                  <Swords size={12} className="text-amber-400" />
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Swords size={13} className="text-amber-400" />
                   <span>Series Match Length</span>
                 </label>
-                <span className="text-[10px] font-bold text-amber-300">
+                <span className="text-xs font-bold text-amber-300">
                   First to {targetWins} {targetWins === 1 ? 'Win' : 'Wins'}
                 </span>
               </div>
@@ -2074,7 +2080,7 @@ export default function App() {
                         setSeriesLength(item.length);
                         triggerHaptic([10]);
                       }}
-                      className={`py-1.5 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
+                      className={`py-2 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
                         isSelected
                           ? isDateNight
                             ? 'bg-rose-500 border-rose-300 text-white font-extrabold shadow-md shadow-rose-500/30'
@@ -2082,8 +2088,8 @@ export default function App() {
                           : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:text-white'
                       }`}
                     >
-                      <span className="text-[11px] leading-none font-bold">{item.label}</span>
-                      <span className="text-[9px] opacity-75 mt-0.5">{item.wins}W</span>
+                      <span className="text-xs leading-none font-bold">{item.label}</span>
+                      <span className="text-[10px] font-bold opacity-80 mt-0.5">{item.wins}W</span>
                     </button>
                   );
                 })}
@@ -2094,28 +2100,28 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handleCreateRoom}
-              className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+              className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                 isDateNight
                   ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/25 border-rose-400/30'
                   : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 shadow-indigo-500/25 border-indigo-400/30'
               }`}
             >
-              <Users size={18} />
+              <Users size={20} />
               <span>Create 2-Player Room (Best of {seriesLength})</span>
             </motion.button>
 
             {/* Join Room Box */}
             <div
-              className={`glass-card p-2.5 space-y-1.5 transition-all ${
+              className={`glass-card p-3 space-y-2 rounded-2xl transition-all ${
                 isUrlJoin ? 'ring-2 ring-indigo-500/80 bg-indigo-950/20' : ''
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
                   {isUrlJoin ? "Friend's Invite Link Ready" : "Join Friend's Room"}
                 </span>
                 {isUrlJoin && (
-                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                  <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
                     Ready
                   </span>
                 )}
@@ -2129,20 +2135,20 @@ export default function App() {
                   value={inputCode}
                   onChange={(e) => setInputCode(e.target.value.slice(0, 4))}
                   placeholder="4-digit code"
-                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-1.5 text-center text-base font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
+                  className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-center text-lg font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
                 />
                 <button
                   onClick={() => handleJoinRoom()}
                   disabled={connectionStatus === 'connecting' || inputCode.length !== 4}
-                  className="px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-xs border border-slate-600/50 transition flex items-center justify-center"
+                  className="px-5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-sm border border-slate-600/50 transition flex items-center justify-center"
                 >
                   {connectionStatus === 'connecting' ? 'Joining...' : 'Join'}
                 </button>
               </div>
 
               {peerError && (
-                <p className="text-[11px] text-rose-400 flex items-center gap-1 pt-0.5">
-                  <AlertCircle size={12} />
+                <p className="text-xs text-rose-400 flex items-center gap-1 pt-0.5">
+                  <AlertCircle size={13} />
                   <span>{peerError}</span>
                 </p>
               )}
@@ -2152,9 +2158,9 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={handlePlaySolo}
-              className="w-full py-2.5 rounded-2xl glass-button text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 hover:bg-slate-800/80"
+              className="w-full py-3 rounded-2xl glass-button text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-slate-800/80"
             >
-              <Bot size={16} className={isDateNight ? 'text-rose-400' : 'text-emerald-400'} />
+              <Bot size={18} className={isDateNight ? 'text-rose-400' : 'text-emerald-400'} />
               <span>
                 {isDateNight
                   ? `Solo Practice vs ${playerName === 'Renia' ? 'Yugi AI 🥂' : 'Renia AI 💕'}`
@@ -2164,12 +2170,12 @@ export default function App() {
           </div>
 
           {/* Footer Info & Quick Stats Pill */}
-          <div className="text-center pt-1.5">
+          <div className="text-center pt-1.5 pb-1">
             <button
               onClick={() => setShowStatsModal(true)}
-              className="text-[11px] text-slate-400 hover:text-amber-300 transition flex items-center justify-center gap-1.5 mx-auto"
+              className="text-xs text-slate-400 hover:text-amber-300 transition flex items-center justify-center gap-1.5 mx-auto"
             >
-              <Flame size={12} className="text-amber-400" />
+              <Flame size={14} className="text-amber-400" />
               <span>
                 {isDateNight
                   ? `Yugi: ${stats.yugiSeriesWon || 0}W • Renia: ${stats.reniaSeriesWon || 0}W • Streak: 🔥 ${stats.currentStreak || 0}`
@@ -2184,18 +2190,18 @@ export default function App() {
       {/* SCREEN 2: WAITING ROOM (HOST) */}
       {/* ================================================================ */}
       {screen === 'waiting' && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-5 py-6 max-w-md mx-auto">
+        <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-5 py-6 max-w-md mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between pt-2">
             <button
               onClick={handleLeaveToLobby}
-              className="px-3 py-1.5 rounded-full glass-button text-xs font-semibold text-slate-300 flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-full glass-button text-xs font-semibold text-slate-300 flex items-center gap-1.5"
             >
-              <ArrowLeft size={14} />
+              <ArrowLeft size={16} />
               <span>Cancel</span>
             </button>
             <span
-              className={`text-xs font-bold tracking-wider ${
+              className={`text-sm font-bold tracking-wider ${
                 isDateNight ? 'text-rose-400' : 'text-indigo-400'
               }`}
             >
@@ -2205,12 +2211,12 @@ export default function App() {
 
           {/* Center Card */}
           <div className="my-auto text-center space-y-5">
-            <div className="space-y-1.5">
-              <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+            <div className="space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
                 <span>Room Created!</span>
                 {isDateNight && <span>❤️</span>}
               </h2>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              <p className="text-sm text-slate-300 max-w-xs mx-auto">
                 {isDateNight
                   ? `Playing for: "${activeWager}" 💕 Share this code with your sweetheart!`
                   : 'Share this 4-digit code or link with your friend to connect and play.'}
@@ -2225,11 +2231,11 @@ export default function App() {
                   : 'border-indigo-500/40 shadow-indigo-950/50'
               }`}
             >
-              <div className="text-[11px] uppercase font-bold text-slate-400 tracking-widest mb-1">
+              <div className="text-xs uppercase font-bold text-slate-400 tracking-widest mb-1.5">
                 Room Code
               </div>
               <div
-                className={`text-5xl font-black tracking-widest font-mono ${
+                className={`text-5xl sm:text-6xl font-black tracking-widest font-mono ${
                   isDateNight ? 'text-rose-300' : 'text-indigo-300'
                 }`}
               >
@@ -2238,17 +2244,17 @@ export default function App() {
             </div>
 
             {/* Share / Copy Buttons */}
-            <div className="space-y-2.5 max-w-xs mx-auto">
+            <div className="space-y-3 max-w-xs mx-auto">
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={handleShareInvite}
-                className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                   isDateNight
                     ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/20 border-rose-400/30'
                     : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/20 border-emerald-400/30'
                 }`}
               >
-                <Share2 size={18} />
+                <Share2 size={20} />
                 <span>Share Invite Link</span>
               </motion.button>
 
@@ -2257,15 +2263,15 @@ export default function App() {
                   const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
                   copyToClipboard(url);
                 }}
-                className="w-full py-2.5 rounded-2xl glass-button text-xs font-semibold text-slate-300 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-2xl glass-button text-sm font-semibold text-slate-300 flex items-center justify-center gap-2"
               >
-                <Copy size={15} />
+                <Copy size={16} />
                 <span>Copy Shareable URL</span>
               </button>
             </div>
 
             {/* Pulse Waiting Status */}
-            <div className="flex items-center justify-center gap-2 text-xs font-medium text-slate-400 pt-1">
+            <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-300 pt-2">
               <span className="relative flex h-2.5 w-2.5">
                 <span
                   className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -2287,7 +2293,7 @@ export default function App() {
           </div>
 
           <div className="text-center pb-2">
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-400">
               Matches play automatically up to {targetWins} wins!
             </p>
           </div>
@@ -2298,20 +2304,20 @@ export default function App() {
       {/* SCREEN 3: GAME ARENA */}
       {/* ================================================================ */}
       {(screen === 'playing' || screen === 'round_over' || screen === 'series_over') && (
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-3.5 py-1.5 max-w-md mx-auto">
+        <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-3.5 py-2 max-w-md mx-auto">
           {/* Top Bar: Navigation, Series Indicator, Mute */}
           <div className="w-full flex items-center justify-between pt-1">
             <button
               onClick={handleLeaveToLobby}
-              className="p-1.5 rounded-xl glass-button text-slate-400 hover:text-white"
+              className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
               title="Leave Room"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={18} />
             </button>
 
             {/* Series Indicator & Target */}
-            <div className="flex items-center gap-1 px-3 py-1 rounded-full glass-panel text-[11px] font-bold border border-white/10">
-              <Swords size={12} className="text-amber-400" />
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full glass-panel text-xs font-bold border border-white/10">
+              <Swords size={14} className="text-amber-400" />
               <span>
                 Round {currentRound} • Best of {seriesLength} (First to {targetWins})
               </span>
@@ -2319,33 +2325,33 @@ export default function App() {
 
             <button
               onClick={handleToggleMute}
-              className="p-1.5 rounded-xl glass-button text-slate-400 hover:text-white"
+              className="p-2 rounded-xl glass-button text-slate-400 hover:text-white"
               title="Toggle Sound"
             >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
           </div>
 
           {/* Series Head-to-Head Scoreboard Card */}
           <div
-            className={`w-full py-1.5 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
+            className={`w-full py-2 px-3.5 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
               isDateNight
                 ? 'bg-rose-950/40 border-rose-500/30'
                 : 'bg-slate-900/60 border-slate-700/50'
             }`}
           >
             {/* Player 1 (Local) */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               {isDateNight ? (
-                <Heart size={14} className="text-rose-400 fill-rose-400" />
+                <Heart size={16} className="text-rose-400 fill-rose-400" />
               ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                <span className="w-3 h-3 rounded-full bg-emerald-400" />
               )}
-              <span className="font-bold text-xs text-white max-w-[90px] truncate">
+              <span className="font-bold text-sm text-white max-w-[105px] truncate">
                 {playerName}
               </span>
               <span
-                className={`text-sm font-black px-2 py-0.5 rounded-lg ${
+                className={`text-base font-black px-2.5 py-1 rounded-xl ${
                   isDateNight ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'
                 }`}
               >
@@ -2353,26 +2359,26 @@ export default function App() {
               </span>
             </div>
 
-            <div className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+            <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
               VS
             </div>
 
             {/* Player 2 (Opponent) */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span
-                className={`text-sm font-black px-2 py-0.5 rounded-lg ${
+                className={`text-base font-black px-2.5 py-1 rounded-xl ${
                   isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
                 }`}
               >
                 {opponentScore}
               </span>
-              <span className="font-bold text-xs text-slate-300 max-w-[90px] truncate">
+              <span className="font-bold text-sm text-slate-300 max-w-[105px] truncate">
                 {opponentName}
               </span>
               {isDateNight ? (
-                <Heart size={14} className="text-amber-400 fill-amber-400" />
+                <Heart size={16} className="text-amber-400 fill-amber-400" />
               ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+                <span className="w-3 h-3 rounded-full bg-indigo-400" />
               )}
             </div>
           </div>
@@ -2382,7 +2388,7 @@ export default function App() {
             <motion.div
               animate={isLocalTurn ? { scale: [1, 1.02, 1] } : {}}
               transition={{ repeat: Infinity, duration: 2.2 }}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 border transition-all ${
                 isLocalTurn
                   ? isDateNight
                     ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-md shadow-rose-950/40'
@@ -2391,7 +2397,7 @@ export default function App() {
               }`}
             >
               <span
-                className={`h-2 w-2 rounded-full ${
+                className={`h-2.5 w-2.5 rounded-full ${
                   isLocalTurn
                     ? isDateNight
                       ? 'bg-rose-400 animate-pulse'
@@ -2403,13 +2409,13 @@ export default function App() {
             </motion.div>
 
             {/* Opponent Lines Dots */}
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
               <span className="text-slate-400 font-bold">{opponentName}:</span>
               <div className="flex gap-1 items-center">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <span
                     key={i}
-                    className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                    className={`w-3 h-3 rounded-full transition-colors ${
                       i < opponentLinesCount
                         ? isDateNight
                           ? 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]'
@@ -2419,7 +2425,7 @@ export default function App() {
                   />
                 ))}
               </div>
-              <span className="font-mono text-[10px] text-slate-400">({opponentLinesCount}/5)</span>
+              <span className="font-mono text-xs font-bold text-slate-400">({opponentLinesCount}/5)</span>
             </div>
           </div>
 
@@ -2431,7 +2437,7 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -8 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                className={`w-full py-1.5 px-3 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
+                className={`w-full py-2 px-3.5 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
                   lineAlert.count >= 4
                     ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 shadow-amber-950/70 text-amber-100 ring-1 ring-amber-400/50'
                     : lineAlert.isOpponent
@@ -2443,21 +2449,21 @@ export default function App() {
                     : 'bg-emerald-950/90 border-emerald-400/50 text-emerald-100'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-base">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg">
                     {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
                   </span>
                   <div>
-                    <div className="text-xs font-black tracking-tight leading-tight">
+                    <div className="text-sm font-black tracking-tight leading-tight">
                       {lineAlert.title}
                     </div>
-                    <div className="text-[10px] opacity-85 leading-tight">
+                    <div className="text-xs opacity-90 leading-tight">
                       {lineAlert.subtitle}
                     </div>
                   </div>
                 </div>
                 <div
-                  className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full shrink-0 border ${
+                  className={`text-xs font-mono font-bold px-3 py-1 rounded-full shrink-0 border ${
                     lineAlert.isOpponent
                       ? 'bg-indigo-900/60 text-indigo-200 border-indigo-400/40'
                       : isDateNight
@@ -2474,10 +2480,10 @@ export default function App() {
 
           {/* B-I-N-G-O Header Badges */}
           <div className="flex flex-col items-center justify-center my-0.5">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">
+            <span className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-1">
               Your B-I-N-G-O Lines ({completedLinesCount}/5)
             </span>
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2.5">
               {BINGO_LETTERS.map((letter, index) => {
                 const isActive = completedLinesCount > index;
                 return (
@@ -2519,7 +2525,19 @@ export default function App() {
                 >
                   {/* Last Called Pulse Ring */}
                   {isLast && <div className="last-called-ring" />}
-                  <span>{isEmpty ? '' : number}</span>
+                  <span>
+                    {isEmpty ? (
+                      !isBoardLocked && nextSequentialNumber ? (
+                        <span className="text-xs sm:text-sm font-semibold opacity-35 select-none">
+                          +{nextSequentialNumber}
+                        </span>
+                      ) : (
+                        ''
+                      )
+                    ) : (
+                      number
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -2528,13 +2546,13 @@ export default function App() {
           {/* In-Game Floating Reactions Emote Bar (Date Night) */}
           {isDateNight && (
             <div className="flex items-center justify-center gap-2 py-0.5">
-              <span className="text-[10px] font-bold text-rose-300 opacity-75">Send Love:</span>
+              <span className="text-xs font-bold text-rose-300 opacity-80">Send Love:</span>
               <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel border border-rose-500/30 shadow-md">
                 {EMOTE_LIST.map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => handleSendEmote(emoji)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm hover:scale-125 active:scale-95 transition"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-base hover:scale-125 active:scale-95 transition"
                     title={`Send ${emoji}`}
                   >
                     {emoji}
@@ -2546,119 +2564,104 @@ export default function App() {
 
           {/* Setup Control Panel / In-game Call Status */}
           {!isBoardLocked ? (
-            setupMode === 'auto' ? (
-              <div className="w-full max-w-sm mx-auto p-2.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2 my-0.5">
-                <div className="flex items-center justify-between gap-2">
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleShuffleBoard}
-                    className="flex-1 py-1.5 px-3 rounded-xl glass-button text-xs font-bold text-amber-300 border-amber-400/30 flex items-center justify-center gap-1.5 shadow hover:bg-slate-800"
-                  >
-                    <Shuffle size={13} />
-                    <span>Shuffle Again</span>
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSwitchToManual}
-                    className="flex-1 py-1.5 px-3 rounded-xl glass-button text-xs font-bold text-slate-200 border-slate-600/40 flex items-center justify-center gap-1.5 shadow hover:bg-slate-800"
-                  >
-                    <RotateCcw size={13} />
-                    <span>Switch to Manual Fill</span>
-                  </motion.button>
+            <div className="w-full max-w-sm mx-auto p-3 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2.5 my-1">
+              {/* Header Status Row */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-bold text-slate-200">Board Setup</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                    {placedCount}/25
+                  </span>
                 </div>
 
+                {nextSequentialNumber !== null ? (
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                      isDateNight
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                    }`}
+                  >
+                    <span>Next on tap:</span>
+                    <span className="font-mono text-sm underline font-black">
+                      #{nextSequentialNumber}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <Check size={14} />
+                    <span>Board Complete!</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Helper Buttons */}
+              <div className="grid grid-cols-3 gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleFillRandom}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow ${
+                    isDateNight
+                      ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                  title="Fill remaining or all slots randomly"
+                >
+                  <Shuffle size={13} className={isDateNight ? 'text-rose-400' : 'text-indigo-400'} />
+                  <span>Random 🎲</span>
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleFillSequential}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow ${
+                    isDateNight
+                      ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                  title="Fill entire board 1 to 25 in order"
+                >
+                  <span className="font-mono text-xs font-black">1➔25</span>
+                  <span>In Order</span>
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleClearBoard}
+                  className="py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
+                  title="Clear all numbers"
+                >
+                  <RotateCcw size={13} className="text-slate-400" />
+                  <span>Clear</span>
+                </motion.button>
+              </div>
+
+              {/* Hint or Lock CTA */}
+              {isBoardFull ? (
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleLockBoard}
-                  className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 border ${
+                  className={`w-full py-3 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 border transition ${
                     isDateNight
-                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/40'
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/40'
+                      ? 'bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/50 animate-pulse'
+                      : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/50 animate-pulse'
                   }`}
                 >
-                  <Lock size={14} />
-                  <span>Lock Board & Ready</span>
+                  <Lock size={16} />
+                  <span>Lock Board & Ready! 🎯</span>
                 </motion.button>
-              </div>
-            ) : (
-              <div className="w-full max-w-sm mx-auto p-2.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2 my-0.5">
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                    <span className={isDateNight ? 'text-rose-400' : 'text-indigo-400'}>
-                      Manual Setup:
-                    </span>
-                    <span className="font-mono text-[11px] text-slate-400">
-                      ({placedCount}/25 placed)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={handleClearBoard}
-                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition"
-                    >
-                      Clear Board
-                    </button>
-                    <button
-                      onClick={handleSwitchToAuto}
-                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition"
-                    >
-                      Auto Fill
-                    </button>
-                  </div>
-                </div>
-
-                {/* Number Tray */}
-                {unplacedNumbers.length > 0 ? (
-                  <div className="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex flex-wrap gap-1.5 justify-center max-h-32 overflow-y-auto">
-                    {unplacedNumbers.map((num) => (
-                      <motion.button
-                        key={num}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handlePlaceTrayNumber(num)}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-all shadow-sm ${
-                          isDateNight
-                            ? 'bg-rose-950/60 hover:bg-rose-600 text-rose-100 border border-rose-500/30'
-                            : 'bg-slate-800 hover:bg-indigo-600 text-slate-100 border border-slate-700'
-                        }`}
-                      >
-                        {num}
-                      </motion.button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-2 text-center text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
-                    <Check size={14} />
-                    <span>All 25 numbers placed on your board!</span>
-                  </div>
-                )}
-
-                {/* Lock CTA when all 25 numbers placed */}
-                {isBoardFull ? (
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={handleLockBoard}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 border ${
-                      isDateNight
-                        ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/40 animate-pulse'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/40 animate-pulse'
-                    }`}
-                  >
-                    <Lock size={14} />
-                    <span>Lock Board & Ready</span>
-                  </motion.button>
-                ) : (
-                  <p className="text-[10px] text-center text-slate-400">
-                    Tap a number in the tray to place it. Tap a placed number to remove it.
-                  </p>
-                )}
-              </div>
-            )
+              ) : (
+                <p className="text-[11px] text-center text-slate-400 leading-snug">
+                  Tap any box to place <strong>#{nextSequentialNumber}</strong>. Tap placed number to remove. Or tap <strong>Random 🎲</strong>!
+                </p>
+              )}
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center min-h-[34px] my-0.5">
+            <div className="flex flex-col items-center justify-center min-h-[38px] my-1">
               {calledNumbers.length === 0 ? (
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-md">
-                    <Lock size={12} className="text-emerald-400" />
+                  <div className="flex items-center gap-2 py-1.5 px-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm font-semibold shadow-md">
+                    <Lock size={13} className="text-emerald-400" />
                     <span>
                       Board Locked & Ready!{' '}
                       {isLocalTurn ? 'Your turn to call!' : `Waiting for ${opponentName}...`}
@@ -2666,7 +2669,7 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400">
+                <div className="flex items-center gap-3 text-xs sm:text-sm font-semibold text-slate-400">
                   <span>
                     Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
                   </span>
@@ -2722,21 +2725,21 @@ export default function App() {
                 )}
               </div>
 
-              <div className="space-y-1">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
+              <div className="space-y-1.5">
+                <span className="text-xs font-black uppercase tracking-widest text-amber-400">
                   Round {roundWinnerInfo.roundNum} Winner
                 </span>
-                <h3 className="text-xl font-black text-white tracking-tight">
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   {roundWinnerInfo.name} Secured the Round!
                 </h3>
-                <p className="text-xs text-slate-300">{roundWinnerInfo.reason}</p>
+                <p className="text-sm text-slate-300">{roundWinnerInfo.reason}</p>
               </div>
 
               {/* Updated Scorecard */}
-              <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-700/60 flex items-center justify-around">
+              <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-700/60 flex items-center justify-around">
                 <div className="text-center">
-                  <span className="text-[10px] font-bold text-slate-400 block">{playerName}</span>
-                  <span className="text-lg font-black text-white">
+                  <span className="text-xs font-bold text-slate-400 block">{playerName}</span>
+                  <span className="text-xl font-black text-white">
                     {roundWinnerInfo.localScore}
                   </span>
                 </div>
@@ -2744,8 +2747,8 @@ export default function App() {
                   First to {targetWins}
                 </div>
                 <div className="text-center">
-                  <span className="text-[10px] font-bold text-slate-400 block">{opponentName}</span>
-                  <span className="text-lg font-black text-white">
+                  <span className="text-xs font-bold text-slate-400 block">{opponentName}</span>
+                  <span className="text-xl font-black text-white">
                     {roundWinnerInfo.opponentScore}
                   </span>
                 </div>
@@ -2753,21 +2756,21 @@ export default function App() {
 
               {/* Next Round CTA */}
               {role === 'guest' ? (
-                <div className="w-full py-3 px-4 rounded-2xl text-slate-300 font-bold text-xs bg-slate-800/80 border border-slate-700/60 flex items-center justify-center gap-2 cursor-not-allowed">
-                  <RefreshCw size={14} className="animate-spin text-slate-400" />
+                <div className="w-full py-3.5 px-4 rounded-2xl text-slate-300 font-bold text-sm bg-slate-800/80 border border-slate-700/60 flex items-center justify-center gap-2 cursor-not-allowed">
+                  <RefreshCw size={16} className="animate-spin text-slate-400" />
                   <span>Waiting for Host to start next round...</span>
                 </div>
               ) : (
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleProceedToNextRound}
-                  className={`w-full py-3 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                  className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                     isDateNight
                       ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30'
                       : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/30 border-indigo-400/30'
                   }`}
                 >
-                  <RefreshCw size={16} />
+                  <RefreshCw size={18} />
                   <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
                 </motion.button>
               )}
@@ -2807,37 +2810,37 @@ export default function App() {
               </div>
 
               {/* Title */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1">
-                  <Star size={12} className="fill-amber-400" />
+              <div className="space-y-1.5">
+                <span className="text-xs font-black uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1.5">
+                  <Star size={13} className="fill-amber-400" />
                   <span>SERIES CHAMPION</span>
-                  <Star size={12} className="fill-amber-400" />
+                  <Star size={13} className="fill-amber-400" />
                 </span>
-                <h3 className="text-2xl font-black text-white tracking-tight">
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   {seriesWinnerInfo.name} WINS THE SERIES!
                 </h3>
-                <p className="text-xs text-slate-300">{seriesWinnerInfo.reason}</p>
+                <p className="text-sm text-slate-300">{seriesWinnerInfo.reason}</p>
               </div>
 
               {/* Final Series Scoreboard */}
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700/60 text-xs space-y-1">
-                <div className="text-[10px] uppercase font-bold text-slate-400">
+              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-xs space-y-1">
+                <div className="text-xs uppercase font-bold text-slate-400">
                   Final Series Score (Best of {seriesLength})
                 </div>
-                <div className="text-2xl font-black text-amber-400 font-mono">
+                <div className="text-3xl font-black text-amber-400 font-mono">
                   {seriesWinnerInfo.finalScore}
                 </div>
               </div>
 
               {/* Official Date Night Contract Awarded */}
               {isDateNight && (
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-950/70 via-rose-950/70 to-amber-950/70 border border-amber-400/50 text-center space-y-1 shadow-lg">
-                  <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center justify-center gap-1">
-                    <Sparkles size={12} className="text-amber-400" />
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/70 via-rose-950/70 to-amber-950/70 border border-amber-400/50 text-center space-y-1 shadow-lg">
+                  <div className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center justify-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-400" />
                     <span>Official Date Night Contract Sealed</span>
-                    <Sparkles size={12} className="text-amber-400" />
+                    <Sparkles size={13} className="text-amber-400" />
                   </div>
-                  <div className="text-xs font-bold text-white">
+                  <div className="text-sm font-bold text-white">
                     {seriesWinnerInfo.name} wins:{' '}
                     <span className="text-amber-400 font-black">
                       {seriesWinnerInfo.wager || activeWager}
@@ -2847,13 +2850,13 @@ export default function App() {
               )}
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2.5 pt-1">
                 {isDateNight && (
                   <button
                     onClick={() => setShowPolaroidModal(true)}
-                    className="w-full py-2.5 rounded-2xl glass-button text-xs font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-2 hover:bg-rose-950/40 shadow-md"
+                    className="w-full py-3 rounded-2xl glass-button text-sm font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-2 hover:bg-rose-950/40 shadow-md"
                   >
-                    <Camera size={15} />
+                    <Camera size={16} />
                     <span>View Date Night Polaroid 📸</span>
                   </button>
                 )}
@@ -2862,13 +2865,13 @@ export default function App() {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSeriesRematch}
                   disabled={rematchStatus === 'requested'}
-                  className={`w-full py-3.5 rounded-2xl text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 border ${
+                  className={`w-full py-4 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                     isDateNight
                       ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/25 border-rose-400/30'
                       : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/25 border-indigo-400/30'
                   }`}
                 >
-                  <RefreshCw size={16} />
+                  <RefreshCw size={18} />
                   <span>
                     {rematchStatus === 'requested'
                       ? 'Waiting for Opponent...'
@@ -2882,7 +2885,7 @@ export default function App() {
 
                 <button
                   onClick={handleLeaveToLobby}
-                  className="w-full py-2 rounded-2xl glass-button text-xs font-semibold text-slate-300 hover:text-white"
+                  className="w-full py-2.5 rounded-2xl glass-button text-sm font-semibold text-slate-300 hover:text-white"
                 >
                   Back to Lobby
                 </button>
@@ -2914,11 +2917,11 @@ export default function App() {
               <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   {activeStatsTab === 'ledger' ? (
-                    <ScrollText size={20} className="text-rose-400" />
+                    <ScrollText size={22} className="text-rose-400" />
                   ) : (
-                    <Flame size={20} className="text-amber-400" />
+                    <Flame size={22} className="text-amber-400" />
                   )}
-                  <h3 className="text-base font-black text-white">
+                  <h3 className="text-lg font-black text-white">
                     {isDateNight
                       ? activeStatsTab === 'ledger'
                         ? 'The Love Ledger 📜'
@@ -2928,7 +2931,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowStatsModal(false)}
-                  className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg glass-button"
+                  className="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg glass-button font-semibold"
                 >
                   Close
                 </button>
@@ -2939,27 +2942,27 @@ export default function App() {
                 <div className="flex rounded-xl bg-slate-900/80 p-1 border border-rose-500/30 shrink-0">
                   <button
                     onClick={() => setActiveStatsTab('stats')}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                       activeStatsTab === 'stats'
                         ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    <Flame size={13} />
+                    <Flame size={14} />
                     <span>Rivalry Stats</span>
                   </button>
                   <button
                     onClick={() => setActiveStatsTab('ledger')}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                       activeStatsTab === 'ledger'
                         ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    <ScrollText size={13} />
+                    <ScrollText size={14} />
                     <span>Love Ledger</span>
                     {pendingDebtsCount > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black flex items-center justify-center ml-0.5">
+                      <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center ml-0.5">
                         {pendingDebtsCount}
                       </span>
                     )}
@@ -2971,20 +2974,20 @@ export default function App() {
               {activeStatsTab === 'stats' ? (
                 <div className="space-y-3 overflow-y-auto pr-0.5">
                   {/* Lifetime Series Record */}
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
+                    <span className="text-xs uppercase font-bold text-slate-400 block">
                       Series Record
                     </span>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-bold text-white">
+                      <span className="font-bold text-white text-sm">
                         {isDateNight ? 'Yugi 🥂' : playerName}
                       </span>
-                      <span className="text-base font-black text-amber-400 font-mono">
+                      <span className="text-lg font-black text-amber-400 font-mono">
                         {isDateNight
                           ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
                           : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
                       </span>
-                      <span className="font-bold text-slate-300">
+                      <span className="font-bold text-slate-300 text-sm">
                         {isDateNight ? 'Renia 🌹' : opponentName}
                       </span>
                     </div>
@@ -2992,32 +2995,32 @@ export default function App() {
 
                   {/* Total Rounds Record */}
                   <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                      <span className="text-xs uppercase font-bold text-slate-400 block">
                         {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
                       </span>
-                      <span className="text-base font-extrabold text-white">
+                      <span className="text-lg font-extrabold text-white">
                         {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
                       </span>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                      <span className="text-xs uppercase font-bold text-slate-400 block">
                         {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
                       </span>
-                      <span className="text-base font-extrabold text-slate-300">
+                      <span className="text-lg font-extrabold text-slate-300">
                         {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
                       </span>
                     </div>
                   </div>
 
                   {/* Current Streak */}
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between text-xs">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      <span className="text-xs uppercase font-bold text-slate-400 block">
                         Current Streak
                       </span>
-                      <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1">
-                        <Flame size={14} className="text-amber-400" />
+                      <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1.5 mt-0.5">
+                        <Flame size={15} className="text-amber-400" />
                         <span>
                           {stats.streakHolder !== 'None'
                             ? `${stats.streakHolder} (${stats.currentStreak} in a row)`
@@ -3028,9 +3031,9 @@ export default function App() {
 
                     <button
                       onClick={handleResetStats}
-                      className="px-2.5 py-1.5 rounded-lg glass-button text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg glass-button text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold"
                     >
-                      <RotateCcw size={12} />
+                      <RotateCcw size={13} />
                       <span>Reset</span>
                     </button>
                   </div>
@@ -3039,17 +3042,17 @@ export default function App() {
                 /* Tab 2: Love Ledger Content */
                 <div className="space-y-3 overflow-y-auto pr-0.5 flex-1">
                   {/* Debts Summary Card */}
-                  <div className="p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/40 to-amber-950/40 border border-rose-500/40 flex items-center justify-around text-center">
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/40 to-amber-950/40 border border-rose-500/40 flex items-center justify-around text-center">
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 block">Yugi Owes</span>
-                      <span className="text-base font-black text-amber-400 font-mono">
+                      <span className="text-xs font-bold text-slate-300 block">Yugi Owes</span>
+                      <span className="text-lg font-black text-amber-400 font-mono">
                         {yugiOwesCount} {yugiOwesCount === 1 ? 'Debt' : 'Debts'}
                       </span>
                     </div>
                     <div className="w-[1px] h-8 bg-rose-500/30" />
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 block">Renia Owes</span>
-                      <span className="text-base font-black text-rose-300 font-mono">
+                      <span className="text-xs font-bold text-slate-300 block">Renia Owes</span>
+                      <span className="text-lg font-black text-rose-300 font-mono">
                         {reniaOwesCount} {reniaOwesCount === 1 ? 'Debt' : 'Debts'}
                       </span>
                     </div>
@@ -3058,9 +3061,9 @@ export default function App() {
                   {/* Wager History List */}
                   {wagerHistory.length === 0 ? (
                     <div className="p-6 text-center space-y-2 rounded-2xl bg-slate-900/40 border border-slate-800">
-                      <Heart size={28} className="mx-auto text-rose-400/60" />
-                      <p className="text-xs font-semibold text-slate-200">No debts recorded yet!</p>
-                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                      <Heart size={32} className="mx-auto text-rose-400/60" />
+                      <p className="text-sm font-semibold text-slate-200">No debts recorded yet!</p>
+                      <p className="text-xs text-slate-400 leading-relaxed">
                         Play a Date Night series to crown a champion and log what the loser has to do 💕
                       </p>
                     </div>
@@ -3075,7 +3078,7 @@ export default function App() {
                               : 'bg-slate-900/50 border-slate-700/40 opacity-75'
                           }`}
                         >
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                             <span className="font-semibold text-slate-300">{item.date}</span>
                             <span className="font-mono font-bold text-amber-400">
                               🏆 {item.winnerName} won ({item.finalScore})
@@ -3084,11 +3087,11 @@ export default function App() {
 
                           <div className="my-1.5 flex items-start justify-between gap-2">
                             <div>
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-300 block">
+                              <span className="text-xs font-extrabold uppercase tracking-wider text-rose-300 block">
                                 {item.loserName}’s Penalty:
                               </span>
                               <span
-                                className={`text-xs font-bold leading-snug block ${
+                                className={`text-sm font-bold leading-snug block ${
                                   item.status === 'fulfilled'
                                     ? 'line-through text-slate-400'
                                     : 'text-white'
@@ -3100,7 +3103,7 @@ export default function App() {
 
                             <button
                               onClick={() => handleToggleWagerStatus(item.id)}
-                              className={`px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0 transition flex items-center gap-1 border ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1 border ${
                                 item.status === 'pending'
                                   ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500 hover:text-white'
                                   : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
@@ -3112,7 +3115,7 @@ export default function App() {
                                 </>
                               ) : (
                                 <>
-                                  <Check size={11} className="stroke-[3]" />
+                                  <Check size={13} className="stroke-[3]" />
                                   <span>Fulfilled ❤️</span>
                                 </>
                               )}

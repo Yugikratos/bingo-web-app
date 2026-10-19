@@ -76,7 +76,7 @@ export function evaluateBoard(board, calledNumbers) {
   WIN_LINES.forEach((line, lineIndex) => {
     const isLineComplete = line.every((tileIndex) => {
       const num = board[tileIndex];
-      return calledSet.has(num);
+      return num !== null && num !== undefined && calledSet.has(num);
     });
 
     if (isLineComplete) {
