@@ -45,6 +45,9 @@ import {
   toggleSoundMuted,
   getSoundMuted
 } from './utils/sound';
+import SplitText from './components/ui/SplitText';
+import RippleButton from './components/ui/RippleButton';
+import GlareCard from './components/ui/GlareCard';
 
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
@@ -2091,7 +2094,7 @@ export default function App() {
 
           {/* Yugi & Renia Exclusive Lifetime Scoreboard on Main Page */}
           {isDateNight && (
-            <motion.div
+            <GlareCard
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               className="mb-2 p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
@@ -2153,12 +2156,12 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </GlareCard>
           )}
 
           {/* Date Night Wager / Stakes Selector */}
           {isDateNight && (
-            <motion.div
+            <GlareCard
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="mb-2 p-3.5 rounded-2xl glass-card border border-rose-500/40 space-y-2 shadow-lg"
@@ -2194,7 +2197,7 @@ export default function App() {
               <p className="text-xs text-slate-400">
                 Type any penalty or bet — winner takes all! 💕
               </p>
-            </motion.div>
+            </GlareCard>
           )}
 
           {/* Name Input & Best-of Selector */}
@@ -2259,8 +2262,7 @@ export default function App() {
             </div>
 
             {/* Create Room Button */}
-            <motion.button
-              whileTap={{ scale: 0.98 }}
+            <RippleButton
               onClick={handleCreateRoom}
               className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                 isDateNight
@@ -2270,7 +2272,7 @@ export default function App() {
             >
               <Users size={20} />
               <span>Create 2-Player Room (Best of {seriesLength})</span>
-            </motion.button>
+            </RippleButton>
 
             {/* Join Room Box */}
             <div
@@ -2299,13 +2301,13 @@ export default function App() {
                   placeholder="4-digit code"
                   className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-center text-lg font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
                 />
-                <button
+                <RippleButton
                   onClick={() => handleJoinRoom()}
                   disabled={connectionStatus === 'connecting' || inputCode.length !== 4}
-                  className="px-5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-sm border border-slate-600/50 transition flex items-center justify-center"
+                  className="px-5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-sm border border-slate-600/50 transition flex items-center justify-center shrink-0"
                 >
                   {connectionStatus === 'connecting' ? 'Joining...' : 'Join'}
-                </button>
+                </RippleButton>
               </div>
 
               {peerError && (
@@ -2975,9 +2977,10 @@ export default function App() {
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400">
                   Round {roundWinnerInfo.roundNum} Winner
                 </span>
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  {roundWinnerInfo.name} Secured the Round!
-                </h3>
+                <SplitText
+                  text={`${roundWinnerInfo.name} Secured the Round!`}
+                  className="text-xl sm:text-2xl font-black text-white tracking-tight"
+                />
                 <p className="text-sm text-slate-300">{roundWinnerInfo.reason}</p>
               </div>
 
@@ -3007,8 +3010,7 @@ export default function App() {
                   <span>Waiting for Host to start next round...</span>
                 </div>
               ) : (
-                <motion.button
-                  whileTap={{ scale: 0.98 }}
+                <RippleButton
                   onClick={handleProceedToNextRound}
                   className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
                     isDateNight
@@ -3018,7 +3020,7 @@ export default function App() {
                 >
                   <RefreshCw size={18} />
                   <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
-                </motion.button>
+                </RippleButton>
               )}
             </motion.div>
           </motion.div>
@@ -3062,9 +3064,10 @@ export default function App() {
                   <span>SERIES CHAMPION</span>
                   <Star size={13} className="fill-amber-400" />
                 </span>
-                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {seriesWinnerInfo.name} WINS THE SERIES!
-                </h3>
+                <SplitText
+                  text={`${seriesWinnerInfo.name} WINS THE SERIES!`}
+                  className="text-2xl sm:text-3xl font-black text-white tracking-tight"
+                />
                 <p className="text-sm text-slate-300">{seriesWinnerInfo.reason}</p>
               </div>
 
@@ -3232,7 +3235,7 @@ export default function App() {
               {activeStatsTab === 'stats' ? (
                 <div className="space-y-3 overflow-y-auto pr-0.5">
                   {/* Lifetime Series Record */}
-                  <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
+                  <GlareCard className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
                     <span className="text-xs uppercase font-bold text-slate-400 block">
                       Series Record
                     </span>
@@ -3249,7 +3252,7 @@ export default function App() {
                         {isDateNight ? 'Renia 🌹' : opponentName}
                       </span>
                     </div>
-                  </div>
+                  </GlareCard>
 
                   {/* Total Rounds Record */}
                   <div className="grid grid-cols-2 gap-2 text-center text-xs">
@@ -3430,9 +3433,11 @@ export default function App() {
                   <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 flex items-center justify-center text-white shadow-lg">
                     <Trophy size={24} />
                   </div>
-                  <div className="text-base font-black text-white tracking-tight">
-                    {seriesWinnerInfo.name} Won! 👑
-                  </div>
+                  <SplitText
+                    as="div"
+                    text={`${seriesWinnerInfo.name} Won! 👑`}
+                    className="text-base font-black text-white tracking-tight"
+                  />
                   <div className="text-[11px] text-amber-300 font-bold font-mono">
                     Series Score: {seriesWinnerInfo.finalScore}
                   </div>
