@@ -1,5 +1,5 @@
-# BINGO // 25 — iOS Premium Edition
-> A production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile (`100dvh` iOS Safari first) with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset Web Audio synthesis, Best-of Series match engine, exclusive Date Night Mode (Yugi & Renia), persistent head-to-head stats tracking, and an intelligent AI practice bot.
+# BINGO // 25 — Real-time P2P Multiplayer Web App
+> A production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile and desktop browsers with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset Web Audio synthesis, Best-of Series match engine, exclusive Date Night Mode (Yugi & Renia), persistent head-to-head stats tracking, and an intelligent AI practice bot.
 
 [![Live App](https://img.shields.io/badge/Live_Deployment-Vercel-black?style=for-the-badge&logo=vercel)](https://bingo-web-app-nine.vercel.app)
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -23,8 +23,8 @@
 * **Best-of Series Match Engine**: Select from **Single Round**, **Best of 3**, **Best of 5**, **Best of 7**, or **Best of 10**. Real-time round win tracking, round transition modals, alternating starters, and grand series champion celebrations.
 * **Exclusive "Date Night" Mode (Yugi & Renia)**: A dedicated romantic theme transforming the app with deep velvet rose surfaces, champagne gold accents (`#FBBF24`), heart icons, playful love banter banners, sweet crystalline harp audio chimes, and flying heart-burst confetti!
 * **Persistent Head-to-Head Stats & Leaderboards (`localStorage`)**: Tracks lifetime series wins, individual round records, and win streaks for both players, viewable from the sleek lobby stats card.
-* **iOS 18 Dark Obsidian Aesthetics**: Mobile-first design tailored for iPhone Safari:
-  - Exact `100dvh` viewport locks and native PWA home-screen support (`apple-mobile-web-app-capable`).
+* **Dark Obsidian & Glassmorphism Aesthetics**: Mobile-first responsive design crafted for mobile and desktop browsers (iOS Safari, Android Chrome, etc.):
+  - Exact `100dvh` viewport adaptation and PWA home-screen support (`apple-mobile-web-app-capable`).
   - Tactile 3D glass tiles with physical bottom lip, depressed called states, and radiant emerald or champagne-rose winning line glows.
   - Ambient radial background glow orbs (`#6366F1` Indigo & `#10B981` Emerald in Classic; `#F43F5E` Velvet Rose & `#FBBF24` Champagne Gold in Date Night).
 * **Zero-Asset Web Audio Synthesizer**: Pure Web Audio API oscillators mathematically synthesizing mechanical pops, woody opponent thocks, harmonic line chimes, romantic harp chords, triumphant arpeggio fanfares, and percussive shuffle ticks without external MP3/WAV files.
