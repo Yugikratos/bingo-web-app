@@ -2933,7 +2933,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* B-I-N-G-O Header Badges */}
-          <div className="flex items-center justify-center gap-2.5 my-1">
+          <div className="grid grid-cols-5 gap-2 w-full max-w-[380px] mx-auto place-items-center">
             {BINGO_LETTERS.map((letter, index) => {
               const isActive = completedLinesCount > index;
               return (
@@ -2941,7 +2941,7 @@ export default function App() {
                   key={letter}
                   animate={isActive ? { scale: [1, 1.15, 1.06] } : { scale: 1 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className={`bingo-badge ${isActive ? 'active' : 'inactive'}`}
+                  className={`bingo-badge w-full max-w-[46px] ${isActive ? 'active' : 'inactive'}`}
                 >
                   {letter}
                 </motion.div>
@@ -2951,7 +2951,7 @@ export default function App() {
 
           {/* 5x5 Tactile Grid with Spring Flying Tiles Physics */}
           <LayoutGroup id="bingo-setup-group">
-            <div className="relative w-full max-w-[420px] mx-auto my-auto">
+            <div className="relative w-full max-w-[380px] mx-auto mt-4 mb-auto">
               <motion.div animate={shakeControls} className="w-full">
                 <div
                   ref={gridContainerRef}
