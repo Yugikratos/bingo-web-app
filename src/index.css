@@ -138,6 +138,7 @@ html, body {
   max-width: 420px;
   margin: 0 auto;
   aspect-ratio: 1 / 1;
+  position: relative;
 }
 
 @media (max-width: 360px) {
