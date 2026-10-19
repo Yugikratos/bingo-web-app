@@ -1299,31 +1299,34 @@ export default function App() {
     if (calledNumbers.length > 0 || isBoardLocked) return;
     playShuffleSound();
     triggerHaptic([15, 25]);
-    const unplaced = Array.from({ length: 25 }, (_, i) => i + 1).filter((n) => !board.includes(n));
-    if (unplaced.length === 0) {
-      // If already full, reshuffle all 25 numbers
-      const fresh = generateBoard();
-      setBoard(fresh);
-      boardRef.current = fresh;
-      showToast('Board reshuffled with random numbers! 🎲');
-      return;
-    }
-    // Shuffle unplaced numbers using Fisher-Yates
-    const shuffledUnplaced = [...unplaced];
-    for (let i = shuffledUnplaced.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledUnplaced[i], shuffledUnplaced[j]] = [shuffledUnplaced[j], shuffledUnplaced[i]];
-    }
-    const newBoard = [...board];
-    let fillIdx = 0;
-    for (let i = 0; i < 25; i++) {
-      if (newBoard[i] === null && fillIdx < shuffledUnplaced.length) {
-        newBoard[i] = shuffledUnplaced[fillIdx++];
+    setBoard((prevBoard) => {
+      const unplaced = Array.from({ length: 25 }, (_, i) => i + 1).filter(
+        (n) => !prevBoard.includes(n)
+      );
+      if (unplaced.length === 0) {
+        // If already full, reshuffle all 25 numbers
+        const fresh = generateBoard();
+        boardRef.current = fresh;
+        showToast('Board reshuffled with random numbers! 🎲');
+        return fresh;
       }
-    }
-    setBoard(newBoard);
-    boardRef.current = newBoard;
-    showToast('Filled empty slots randomly! 🎲');
+      // Shuffle unplaced numbers using Fisher-Yates
+      const shuffledUnplaced = [...unplaced];
+      for (let i = shuffledUnplaced.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledUnplaced[i], shuffledUnplaced[j]] = [shuffledUnplaced[j], shuffledUnplaced[i]];
+      }
+      const next = [...prevBoard];
+      let fillIdx = 0;
+      for (let i = 0; i < 25; i++) {
+        if (next[i] === null && fillIdx < shuffledUnplaced.length) {
+          next[i] = shuffledUnplaced[fillIdx++];
+        }
+      }
+      boardRef.current = next;
+      showToast('Filled empty slots randomly! 🎲');
+      return next;
+    });
   };
 
   // Fill Board Sequentially (1 to 25 in order)
@@ -1368,34 +1371,47 @@ export default function App() {
   };
 
   // Human Player taps a number tile
-  const handleTileClick = (number, index) => {
+  const handleTileClick = (index) => {
     if (screen !== 'playing') return;
 
     // Guardrail: if board is not locked yet, handle on-tap sequential fill or remove
     if (!isBoardLocked) {
-      if (number === null) {
-        // Tapped empty box: place next sequential number into this box
-        if (nextSequentialNumber !== null) {
+      setBoard((prevBoard) => {
+        const currentVal = prevBoard[index];
+
+        // Tapped a placed number: remove it and return it to unplaced pool
+        if (currentVal !== null) {
           playTapSound();
-          triggerHaptic([12]);
-          const newBoard = [...board];
-          newBoard[index] = nextSequentialNumber;
-          setBoard(newBoard);
-          boardRef.current = newBoard;
+          triggerHaptic([10]);
+          const next = [...prevBoard];
+          next[index] = null;
+          boardRef.current = next;
+          showToast(`Removed #${currentVal}`);
+          return next;
         }
-      } else {
-        // Tapped placed number: remove it and return it to unplaced pool
+
+        // Tapped empty box: place the lowest unplaced number (1, 2, 3... 25) in sequence!
+        let nextNum = 1;
+        while (nextNum <= 25 && prevBoard.includes(nextNum)) {
+          nextNum++;
+        }
+
+        if (nextNum > 25) {
+          showToast('Board is full! Lock when ready 🔒');
+          return prevBoard;
+        }
+
         playTapSound();
-        triggerHaptic([10]);
-        const newBoard = [...board];
-        newBoard[index] = null;
-        setBoard(newBoard);
-        boardRef.current = newBoard;
-        showToast(`Removed #${number}`);
-      }
+        triggerHaptic([12]);
+        const next = [...prevBoard];
+        next[index] = nextNum;
+        boardRef.current = next;
+        return next;
+      });
       return;
     }
 
+    const number = boardRef.current[index];
     if (number === null) return;
 
     // Check turn
@@ -2512,7 +2528,7 @@ export default function App() {
                 <button
                   key={index}
                   disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
-                  onClick={() => handleTileClick(number, index)}
+                  onClick={() => handleTileClick(index)}
                   className={`bingo-tile ${
                     isEmpty
                       ? 'empty'
@@ -2525,19 +2541,7 @@ export default function App() {
                 >
                   {/* Last Called Pulse Ring */}
                   {isLast && <div className="last-called-ring" />}
-                  <span>
-                    {isEmpty ? (
-                      !isBoardLocked && nextSequentialNumber ? (
-                        <span className="text-xs sm:text-sm font-semibold opacity-35 select-none">
-                          +{nextSequentialNumber}
-                        </span>
-                      ) : (
-                        ''
-                      )
-                    ) : (
-                      number
-                    )}
-                  </span>
+                  <span>{isEmpty ? '' : number}</span>
                 </button>
               );
             })}
@@ -2564,12 +2568,12 @@ export default function App() {
 
           {/* Setup Control Panel / In-game Call Status */}
           {!isBoardLocked ? (
-            <div className="w-full max-w-sm mx-auto p-3 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2.5 my-1">
+            <div className="w-full max-w-sm mx-auto p-3.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2.5 my-1">
               {/* Header Status Row */}
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs sm:text-sm font-bold text-slate-200">Board Setup</span>
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
                     {placedCount}/25
                   </span>
                 </div>
@@ -2641,7 +2645,7 @@ export default function App() {
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleLockBoard}
-                  className={`w-full py-3 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 border transition ${
+                  className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 border transition ${
                     isDateNight
                       ? 'bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/50 animate-pulse'
                       : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/50 animate-pulse'
@@ -2651,8 +2655,8 @@ export default function App() {
                   <span>Lock Board & Ready! 🎯</span>
                 </motion.button>
               ) : (
-                <p className="text-[11px] text-center text-slate-400 leading-snug">
-                  Tap any box to place <strong>#{nextSequentialNumber}</strong>. Tap placed number to remove. Or tap <strong>Random 🎲</strong>!
+                <p className="text-xs text-center text-slate-300 leading-snug">
+                  👉 <strong>Tap any box</strong> to place <strong>#{nextSequentialNumber}</strong> in sequence. Tap a placed number to remove. Or tap <strong>Random 🎲</strong>!
                 </p>
               )}
             </div>
