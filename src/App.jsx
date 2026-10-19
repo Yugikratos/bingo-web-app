@@ -50,7 +50,22 @@ import RippleButton from './components/ui/RippleButton';
 import GlareCard from './components/ui/GlareCard';
 import MeteorRay from './components/ui/MeteorRay';
 
-const PEER_PREFIX = 'bingo25-live-room-';
+const PEER_PREFIX = 'bingo25-v4-';
+
+const PEER_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' }
+    ],
+    iceCandidatePoolSize: 10
+  }
+};
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
 
 const WAGER_PRESETS = [
@@ -256,12 +271,16 @@ export default function App() {
   // WebRTC & Line History Refs
   const peerRef = useRef(null);
   const connRef = useRef(null);
+  const handshakeIntervalRef = useRef(null);
+  const joinTimeoutRef = useRef(null);
   const prevCompletedLinesRef = useRef(0);
   const prevCompletedLineIdsRef = useRef([]);
   const prevOpponentLinesCountRef = useRef(0);
   const prevBotCompletedLineIdsRef = useRef([]);
 
   // Stale-closure prevention refs for WebRTC listeners and timers
+  const screenRef = useRef(screen);
+  const connectionStatusRef = useRef(connectionStatus);
   const boardRef = useRef(board);
   const botBoardRef = useRef(botBoard);
   const isBoardLockedRef = useRef(isBoardLocked);
@@ -275,6 +294,8 @@ export default function App() {
   const activeWagerRef = useRef(activeWager);
   const currentRoundRef = useRef(currentRound);
 
+  useEffect(() => { screenRef.current = screen; }, [screen]);
+  useEffect(() => { connectionStatusRef.current = connectionStatus; }, [connectionStatus]);
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { botBoardRef.current = botBoard; }, [botBoard]);
   useEffect(() => { isBoardLockedRef.current = isBoardLocked; }, [isBoardLocked]);
@@ -483,6 +504,8 @@ export default function App() {
   // Cleanup WebRTC connections on unmount
   useEffect(() => {
     return () => {
+      if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+      if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
       if (connRef.current) connRef.current.close();
       if (peerRef.current) peerRef.current.destroy();
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -914,67 +937,86 @@ export default function App() {
             setIsDateNight(true);
           }
           // Do NOT overwrite host's room wager with guest's default!
-          conn.send({
-            type: 'HELLO_ACK',
-            name: playerNameRef.current,
-            turn: 'host',
-            seriesLength: seriesLengthRef.current,
-            isDateNight: isDateNightRef.current,
-            wager: activeWagerRef.current
-          });
-          setScreen('playing');
-          setRole('host');
-          setTurn('host');
-          setFirstTurnRole('host');
-          setLocalScore(0);
-          localScoreRef.current = 0;
-          setOpponentScore(0);
-          opponentScoreRef.current = 0;
-          setCurrentRound(1);
-          currentRoundRef.current = 1;
-          const hostEmptyBoard = Array(25).fill(null);
-          setBoard(hostEmptyBoard);
-          boardRef.current = hostEmptyBoard;
-          setIsBoardLocked(false);
-          isBoardLockedRef.current = false;
-          setSetupMode('manual');
-          prevCompletedLinesRef.current = 0;
-          prevCompletedLineIdsRef.current = [];
-          prevOpponentLinesCountRef.current = 0;
-          prevBotCompletedLineIdsRef.current = [];
-          setLineAlert(null);
-          showToast(
-            `${data.name || 'Friend'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
-          );
+          try {
+            conn.send({
+              type: 'HELLO_ACK',
+              name: playerNameRef.current,
+              turn: 'host',
+              seriesLength: seriesLengthRef.current,
+              isDateNight: isDateNightRef.current,
+              wager: activeWagerRef.current
+            });
+          } catch (e) {
+            console.error('Failed to send HELLO_ACK:', e);
+          }
+
+          if (screenRef.current !== 'playing') {
+            setScreen('playing');
+            setRole('host');
+            setTurn('host');
+            setFirstTurnRole('host');
+            setLocalScore(0);
+            localScoreRef.current = 0;
+            setOpponentScore(0);
+            opponentScoreRef.current = 0;
+            setCurrentRound(1);
+            currentRoundRef.current = 1;
+            const hostEmptyBoard = Array(25).fill(null);
+            setBoard(hostEmptyBoard);
+            boardRef.current = hostEmptyBoard;
+            setIsBoardLocked(false);
+            isBoardLockedRef.current = false;
+            setSetupMode('manual');
+            prevCompletedLinesRef.current = 0;
+            prevCompletedLineIdsRef.current = [];
+            prevOpponentLinesCountRef.current = 0;
+            prevBotCompletedLineIdsRef.current = [];
+            setLineAlert(null);
+            showToast(
+              `${data.name || 'Friend'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
+            );
+          }
           break;
         }
 
         case 'HELLO_ACK': {
+          if (handshakeIntervalRef.current) {
+            clearInterval(handshakeIntervalRef.current);
+            handshakeIntervalRef.current = null;
+          }
+          if (joinTimeoutRef.current) {
+            clearTimeout(joinTimeoutRef.current);
+            joinTimeoutRef.current = null;
+          }
           setOpponentName(data.name || 'Opponent');
           if (data.seriesLength) setSeriesLength(data.seriesLength);
           if (typeof data.isDateNight === 'boolean') setIsDateNight(data.isDateNight);
           if (data.wager) setCustomWager(data.wager);
-          setScreen('playing');
-          setTurn(data.turn || 'host');
-          setFirstTurnRole(data.turn || 'host');
-          setLocalScore(0);
-          localScoreRef.current = 0;
-          setOpponentScore(0);
-          opponentScoreRef.current = 0;
-          setCurrentRound(1);
-          currentRoundRef.current = 1;
-          const guestEmptyBoard = Array(25).fill(null);
-          setBoard(guestEmptyBoard);
-          boardRef.current = guestEmptyBoard;
-          setIsBoardLocked(false);
-          isBoardLockedRef.current = false;
-          setSetupMode('manual');
-          prevCompletedLinesRef.current = 0;
-          prevCompletedLineIdsRef.current = [];
-          prevOpponentLinesCountRef.current = 0;
-          prevBotCompletedLineIdsRef.current = [];
-          setLineAlert(null);
-          showToast(`Connected with ${data.name || 'Friend'}! 💕`);
+
+          if (screenRef.current !== 'playing') {
+            setScreen('playing');
+            setRole('guest');
+            setTurn(data.turn || 'host');
+            setFirstTurnRole(data.turn || 'host');
+            setLocalScore(0);
+            localScoreRef.current = 0;
+            setOpponentScore(0);
+            opponentScoreRef.current = 0;
+            setCurrentRound(1);
+            currentRoundRef.current = 1;
+            const guestEmptyBoard = Array(25).fill(null);
+            setBoard(guestEmptyBoard);
+            boardRef.current = guestEmptyBoard;
+            setIsBoardLocked(false);
+            isBoardLockedRef.current = false;
+            setSetupMode('manual');
+            prevCompletedLinesRef.current = 0;
+            prevCompletedLineIdsRef.current = [];
+            prevOpponentLinesCountRef.current = 0;
+            prevBotCompletedLineIdsRef.current = [];
+            setLineAlert(null);
+            showToast(`Connected with ${data.name || 'Friend'}! 💕`);
+          }
           break;
         }
 
@@ -1264,8 +1306,17 @@ export default function App() {
   };
 
   // 1. Host: Create Room Flow
-  const handleCreateRoom = () => {
-    if (peerRef.current) peerRef.current.destroy();
+  const handleCreateRoom = (retryCount = 0) => {
+    if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+    if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
+    if (connRef.current) {
+      try { connRef.current.close(); } catch (e) {}
+      connRef.current = null;
+    }
+    if (peerRef.current) {
+      try { peerRef.current.destroy(); } catch (e) {}
+      peerRef.current = null;
+    }
 
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(code);
@@ -1274,32 +1325,62 @@ export default function App() {
     setConnectionStatus('connecting');
     setScreen('waiting');
 
-    const peer = new Peer(PEER_PREFIX + code, {
-      debug: 1
-    });
-    peerRef.current = peer;
+    try {
+      const hostPeerId = PEER_PREFIX + code;
+      const peer = new Peer(hostPeerId, PEER_CONFIG);
+      peerRef.current = peer;
 
-    peer.on('open', () => {
-      setConnectionStatus('idle');
-    });
-
-    peer.on('connection', (conn) => {
-      connRef.current = conn;
-      conn.on('open', () => {
-        setConnectionStatus('connected');
-        attachDataHandler(conn);
+      peer.on('open', () => {
+        setConnectionStatus('idle');
+        setPeerError('');
       });
-    });
 
-    peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      if (err.type === 'unavailable-id') {
-        handleCreateRoom();
-      } else {
-        setPeerError(err.message || 'Unable to connect to matchmaking server.');
-        setConnectionStatus('error');
-      }
-    });
+      peer.on('connection', (conn) => {
+        connRef.current = conn;
+
+        // Attach data handler IMMEDIATELY so incoming HELLO packet is never missed
+        attachDataHandler(conn);
+
+        const handleOpen = () => {
+          setConnectionStatus('connected');
+        };
+
+        if (conn.open) {
+          handleOpen();
+        } else {
+          conn.on('open', handleOpen);
+        }
+
+        conn.on('close', () => {
+          if (screenRef.current === 'playing') {
+            showToast('Opponent disconnected');
+            setConnectionStatus('idle');
+          }
+        });
+
+        conn.on('error', (err) => {
+          console.error('Host connection error:', err);
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error('Host peer error:', err);
+        if (err.type === 'unavailable-id' && retryCount < 3) {
+          // Room ID already occupied on PeerJS cloud; re-roll code
+          handleCreateRoom(retryCount + 1);
+        } else if (err.type === 'network') {
+          setPeerError('Network error connecting to matchmaking server.');
+          setConnectionStatus('error');
+        } else {
+          setPeerError(err.message || 'Matchmaking server connection error.');
+          setConnectionStatus('error');
+        }
+      });
+    } catch (err) {
+      console.error('Error creating host peer:', err);
+      setPeerError('Failed to initialize peer connection.');
+      setConnectionStatus('error');
+    }
   };
 
   // 2. Guest: Join Room Flow
@@ -1310,44 +1391,138 @@ export default function App() {
       return;
     }
 
-    if (peerRef.current) peerRef.current.destroy();
+    if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+    if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
+    if (connRef.current) {
+      try { connRef.current.close(); } catch (e) {}
+      connRef.current = null;
+    }
+    if (peerRef.current) {
+      try { peerRef.current.destroy(); } catch (e) {}
+      peerRef.current = null;
+    }
 
     setRoomCode(code);
     setRole('guest');
     setPeerError('');
     setConnectionStatus('connecting');
 
-    const peer = new Peer();
-    peerRef.current = peer;
+    // 15-second connection timeout guardrail
+    joinTimeoutRef.current = setTimeout(() => {
+      if (screenRef.current !== 'playing') {
+        if (handshakeIntervalRef.current) {
+          clearInterval(handshakeIntervalRef.current);
+          handshakeIntervalRef.current = null;
+        }
+        setConnectionStatus('error');
+        setPeerError(`Could not connect to Room ${code}. Make sure your friend has the room open.`);
+        showToast(`Could not connect to Room ${code}`);
+      }
+    }, 15000);
 
-    peer.on('open', () => {
-      const hostPeerId = PEER_PREFIX + code;
-      const conn = peer.connect(hostPeerId, { reliable: true });
-      connRef.current = conn;
+    try {
+      const peer = new Peer(PEER_CONFIG);
+      peerRef.current = peer;
 
-      conn.on('open', () => {
-        setConnectionStatus('connected');
+      peer.on('open', () => {
+        const hostPeerId = PEER_PREFIX + code;
+        const conn = peer.connect(hostPeerId, { reliable: true });
+        connRef.current = conn;
+
+        // Attach data handler IMMEDIATELY
         attachDataHandler(conn);
-        conn.send({
-          type: 'HELLO',
-          name: playerName,
-          isDateNight,
-          wager: activeWager
+
+        const sendHello = () => {
+          if (conn.open) {
+            try {
+              conn.send({
+                type: 'HELLO',
+                name: playerNameRef.current,
+                isDateNight: isDateNightRef.current,
+                wager: activeWagerRef.current
+              });
+            } catch (e) {
+              console.warn('Failed to send HELLO:', e);
+            }
+          }
+        };
+
+        const handleOpen = () => {
+          setConnectionStatus('connected');
+          sendHello();
+
+          // Handshake retry loop: resend HELLO every 600ms until 'playing' or 12 attempts
+          if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+          let attempts = 0;
+          handshakeIntervalRef.current = setInterval(() => {
+            attempts++;
+            if (screenRef.current === 'playing' || attempts > 12) {
+              clearInterval(handshakeIntervalRef.current);
+              handshakeIntervalRef.current = null;
+              return;
+            }
+            if (conn.open) {
+              sendHello();
+            }
+          }, 600);
+        };
+
+        if (conn.open) {
+          handleOpen();
+        } else {
+          conn.on('open', handleOpen);
+        }
+
+        conn.on('close', () => {
+          if (handshakeIntervalRef.current) {
+            clearInterval(handshakeIntervalRef.current);
+            handshakeIntervalRef.current = null;
+          }
+          if (screenRef.current === 'playing') {
+            showToast('Opponent disconnected');
+            setConnectionStatus('idle');
+          }
+        });
+
+        conn.on('error', (err) => {
+          console.error('Guest connection error:', err);
+          if (handshakeIntervalRef.current) {
+            clearInterval(handshakeIntervalRef.current);
+            handshakeIntervalRef.current = null;
+          }
+          if (joinTimeoutRef.current) {
+            clearTimeout(joinTimeoutRef.current);
+            joinTimeoutRef.current = null;
+          }
+          setPeerError(`Could not reach Room ${code}. Check the code and try again.`);
+          setConnectionStatus('error');
         });
       });
 
-      conn.on('error', (err) => {
-        console.error('Guest connection error:', err);
-        setPeerError('Could not reach host room. Check code and try again.');
+      peer.on('error', (err) => {
+        console.error('Guest peer error:', err);
+        if (handshakeIntervalRef.current) {
+          clearInterval(handshakeIntervalRef.current);
+          handshakeIntervalRef.current = null;
+        }
+        if (joinTimeoutRef.current) {
+          clearTimeout(joinTimeoutRef.current);
+          joinTimeoutRef.current = null;
+        }
+        if (err.type === 'peer-unavailable') {
+          setPeerError(`Room ${code} not found. Please verify the code and make sure the host has the room open.`);
+        } else if (err.type === 'network') {
+          setPeerError('Network error connecting to matchmaking server.');
+        } else {
+          setPeerError(err.message || 'Failed to initialize connection. Please try again.');
+        }
         setConnectionStatus('error');
       });
-    });
-
-    peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      setPeerError('Failed to initialize connection. Please try again.');
+    } catch (err) {
+      console.error('Error creating guest peer:', err);
+      setPeerError('Failed to initialize connection.');
       setConnectionStatus('error');
-    });
+    }
   };
 
   // 3. Solo Practice vs Smart Bot Mode Flow
@@ -1418,11 +1593,37 @@ export default function App() {
     }
   };
 
+  const fallbackCopyText = (text) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        showToast('Invite Link Copied! 📋');
+      } else {
+        showToast(`Room Code: ${roomCode}`);
+      }
+    } catch (e) {
+      showToast(`Room Code: ${roomCode}`);
+    }
+  };
+
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(
-      () => showToast('Invite Link Copied!'),
-      () => showToast('Failed to copy link')
-    );
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => showToast('Invite Link Copied! 📋'),
+        () => fallbackCopyText(text)
+      );
+    } else {
+      fallbackCopyText(text);
+    }
   };
 
   // Copy or Share Polaroid Memory Card
@@ -1808,6 +2009,14 @@ export default function App() {
 
   // Leave Game / Back to Lobby
   const handleLeaveToLobby = () => {
+    if (handshakeIntervalRef.current) {
+      clearInterval(handshakeIntervalRef.current);
+      handshakeIntervalRef.current = null;
+    }
+    if (joinTimeoutRef.current) {
+      clearTimeout(joinTimeoutRef.current);
+      joinTimeoutRef.current = null;
+    }
     if (connRef.current && connRef.current.open) {
       connRef.current.send({ type: 'LEAVE' });
       connRef.current.close();
@@ -2256,6 +2465,47 @@ export default function App() {
               </div>
             </div>
 
+            {/* Prominent Invite Link Hero Banner (when opening ?room=XXXX) */}
+            {isUrlJoin && inputCode && (
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className={`p-3.5 rounded-2xl border shadow-xl flex flex-col gap-2.5 ${
+                  isDateNight
+                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/70 to-amber-950/60 border-rose-400/50 shadow-rose-950/60'
+                    : 'bg-gradient-to-r from-indigo-950/90 via-indigo-900/70 to-purple-950/60 border-indigo-400/50 shadow-indigo-950/60'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      Match Invite Ready
+                    </span>
+                  </div>
+                  <span className="font-mono text-sm font-black text-white px-2.5 py-0.5 rounded-lg bg-black/50 border border-white/10">
+                    Room #{inputCode}
+                  </span>
+                </div>
+                <RippleButton
+                  onClick={() => handleJoinRoom(inputCode)}
+                  disabled={connectionStatus === 'connecting'}
+                  className={`w-full py-3.5 rounded-xl text-white font-black text-base flex items-center justify-center gap-2 shadow-lg border border-white/20 transition ${
+                    isDateNight
+                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/40'
+                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/40'
+                  }`}
+                >
+                  <Users size={20} />
+                  <span>
+                    {connectionStatus === 'connecting'
+                      ? 'Connecting to Room...'
+                      : `Join Room #${inputCode} Now`}
+                  </span>
+                </RippleButton>
+              </motion.div>
+            )}
+
             {/* Create Room Button */}
             <RippleButton
               onClick={handleCreateRoom}
@@ -2292,7 +2542,10 @@ export default function App() {
                   pattern="[0-9]*"
                   maxLength={4}
                   value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value.slice(0, 4))}
+                  onChange={(e) => {
+                    setInputCode(e.target.value.slice(0, 4));
+                    if (peerError) setPeerError('');
+                  }}
                   placeholder="4-digit code"
                   className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3 py-2 text-center text-lg font-mono font-bold tracking-widest text-white placeholder-slate-500 outline-none transition"
                 />
@@ -2306,10 +2559,18 @@ export default function App() {
               </div>
 
               {peerError && (
-                <p className="text-xs text-rose-400 flex items-center gap-1 pt-0.5">
-                  <AlertCircle size={13} />
-                  <span>{peerError}</span>
-                </p>
+                <div className="p-2 rounded-lg bg-rose-950/60 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-1.5 pt-1">
+                  <AlertCircle size={14} className="shrink-0 text-rose-400 mt-0.5" />
+                  <div className="flex-1">
+                    <span>{peerError}</span>
+                    <button
+                      onClick={() => handleJoinRoom()}
+                      className="block mt-1 font-bold text-rose-400 hover:underline"
+                    >
+                      Tap to Retry Join
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -2429,25 +2690,51 @@ export default function App() {
               </button>
             </div>
 
-            {/* Pulse Waiting Status */}
-            <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-300 pt-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    isDateNight ? 'bg-rose-400' : 'bg-emerald-400'
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                    isDateNight ? 'bg-rose-500' : 'bg-emerald-500'
-                  }`}
-                />
-              </span>
-              <span>
-                {isDateNight
-                  ? 'Waiting for darling to connect...'
-                  : 'Waiting for opponent to connect...'}
-              </span>
+            {/* Connection Error Banner & Regenerate Button */}
+            {peerError && (
+              <div className="max-w-xs mx-auto p-3 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-300 flex flex-col items-center gap-2 text-center shadow-lg">
+                <div className="flex items-center gap-1.5 font-bold text-rose-200">
+                  <AlertCircle size={15} className="text-rose-400 shrink-0" />
+                  <span>Connection Issue</span>
+                </div>
+                <p>{peerError}</p>
+                <button
+                  onClick={() => handleCreateRoom()}
+                  className="px-4 py-1.5 rounded-lg bg-rose-500 text-white font-bold text-xs hover:bg-rose-600 transition shadow-md shadow-rose-500/30"
+                >
+                  Regenerate Room
+                </button>
+              </div>
+            )}
+
+            {/* Live Waiting Status Indicator */}
+            <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-300 pt-1">
+              {connectionStatus === 'connecting' ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin text-amber-400" />
+                  <span className="text-amber-300">Registering room with server...</span>
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span
+                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        isDateNight ? 'bg-rose-400' : 'bg-emerald-400'
+                      }`}
+                    />
+                    <span
+                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                        isDateNight ? 'bg-rose-500' : 'bg-emerald-500'
+                      }`}
+                    />
+                  </span>
+                  <span>
+                    {isDateNight
+                      ? 'Room is live! Waiting for darling to connect...'
+                      : 'Room is live! Waiting for opponent to connect...'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
