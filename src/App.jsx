@@ -1329,17 +1329,6 @@ export default function App() {
     });
   };
 
-  // Fill Board Sequentially (1 to 25 in order)
-  const handleFillSequential = () => {
-    if (calledNumbers.length > 0 || isBoardLocked) return;
-    playTapSound();
-    triggerHaptic([15]);
-    const seq = Array.from({ length: 25 }, (_, i) => i + 1);
-    setBoard(seq);
-    boardRef.current = seq;
-    showToast('Board filled 1 to 25! 🔢');
-  };
-
   // Clear Board in Setup Mode
   const handleClearBoard = () => {
     if (calledNumbers.length > 0 || isBoardLocked) return;
@@ -2350,24 +2339,29 @@ export default function App() {
 
           {/* Series Head-to-Head Scoreboard Card */}
           <div
-            className={`w-full py-2 px-3.5 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
+            className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
               isDateNight
                 ? 'bg-rose-950/40 border-rose-500/30'
                 : 'bg-slate-900/60 border-slate-700/50'
             }`}
           >
             {/* Player 1 (Local) */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {isDateNight ? (
-                <Heart size={16} className="text-rose-400 fill-rose-400" />
+                <Heart size={16} className="text-rose-400 fill-rose-400 shrink-0" />
               ) : (
-                <span className="w-3 h-3 rounded-full bg-emerald-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
               )}
-              <span className="font-bold text-sm text-white max-w-[105px] truncate">
-                {playerName}
-              </span>
+              <div className="min-w-0">
+                <span className="font-bold text-xs sm:text-sm text-white truncate block max-w-[85px] sm:max-w-[110px]">
+                  {playerName}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold block">
+                  {completedLinesCount}/5 lines
+                </span>
+              </div>
               <span
-                className={`text-base font-black px-2.5 py-1 rounded-xl ${
+                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 ${
                   isDateNight ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'
                 }`}
               >
@@ -2375,111 +2369,112 @@ export default function App() {
               </span>
             </div>
 
-            <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
+            <div className="text-[11px] font-black uppercase text-slate-500 tracking-wider px-1">
               VS
             </div>
 
             {/* Player 2 (Opponent) */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0 justify-end">
               <span
-                className={`text-base font-black px-2.5 py-1 rounded-xl ${
+                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 ${
                   isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
                 }`}
               >
                 {opponentScore}
               </span>
-              <span className="font-bold text-sm text-slate-300 max-w-[105px] truncate">
-                {opponentName}
-              </span>
+              <div className="text-right min-w-0">
+                <span className="font-bold text-xs sm:text-sm text-slate-300 truncate block max-w-[85px] sm:max-w-[110px]">
+                  {opponentName}
+                </span>
+                {/* Opponent 5 dots */}
+                <div className="flex items-center justify-end gap-1">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <span
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i < opponentLinesCount
+                          ? isDateNight
+                            ? 'bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]'
+                            : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                          : 'bg-slate-700/80 border border-slate-600/40'
+                      }`}
+                    />
+                  ))}
+                  <span className="text-[10px] font-mono text-slate-400 ml-0.5">({opponentLinesCount}/5)</span>
+                </div>
+              </div>
               {isDateNight ? (
-                <Heart size={16} className="text-amber-400 fill-amber-400" />
+                <Heart size={16} className="text-amber-400 fill-amber-400 shrink-0" />
               ) : (
-                <span className="w-3 h-3 rounded-full bg-indigo-400" />
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0" />
               )}
             </div>
           </div>
 
-          {/* Turn Status Pill Banner */}
-          <div className="flex items-center justify-between px-1">
+          {/* Dedicated Centered Turn Status Banner */}
+          <div className="flex items-center justify-center w-full my-0.5">
             <motion.div
               animate={isLocalTurn ? { scale: [1, 1.02, 1] } : {}}
               transition={{ repeat: Infinity, duration: 2.2 }}
-              className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 border transition-all ${
-                isLocalTurn
+              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 border shadow-sm transition-all max-w-[95%] justify-center ${
+                !isBoardLocked
+                  ? 'bg-slate-800/80 text-amber-300 border-amber-500/30'
+                  : isLocalTurn
                   ? isDateNight
-                    ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-md shadow-rose-950/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-md shadow-emerald-500/20'
+                    ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-rose-950/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-500/20'
                   : 'bg-slate-800/60 text-slate-300 border-slate-700/40'
               }`}
             >
               <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  isLocalTurn
+                className={`h-2 w-2 rounded-full shrink-0 ${
+                  !isBoardLocked
+                    ? 'bg-amber-400 animate-pulse'
+                    : isLocalTurn
                     ? isDateNight
                       ? 'bg-rose-400 animate-pulse'
                       : 'bg-emerald-400 animate-pulse'
                     : 'bg-indigo-400'
                 }`}
               />
-              <span>{statusBannerText}</span>
+              <span className="truncate">
+                {!isBoardLocked
+                  ? 'Setup Phase: Tap boxes to place numbers'
+                  : statusBannerText}
+              </span>
             </motion.div>
-
-            {/* Opponent Lines Dots */}
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-              <span className="text-slate-400 font-bold">{opponentName}:</span>
-              <div className="flex gap-1 items-center">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <span
-                    key={i}
-                    className={`w-3 h-3 rounded-full transition-colors ${
-                      i < opponentLinesCount
-                        ? isDateNight
-                          ? 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]'
-                          : 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                        : 'bg-slate-700/80 border border-slate-600/40'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="font-mono text-xs font-bold text-slate-400">({opponentLinesCount}/5)</span>
-            </div>
           </div>
 
-          {/* Prominent Line Completion Alert Banner (Visible for 4.8s on BOTH screens!) */}
+          {/* Prominent Line Completion Alert Banner (Compact & Sleek) */}
           <AnimatePresence>
             {lineAlert && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: -8 }}
+                initial={{ opacity: 0, scale: 0.95, y: -6 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                exit={{ opacity: 0, scale: 0.95, y: -6 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                className={`w-full py-2 px-3.5 rounded-2xl flex items-center justify-between shadow-2xl border my-0.5 ${
+                className={`w-full py-1.5 px-3 rounded-xl flex items-center justify-between shadow-xl border my-0.5 ${
                   lineAlert.count >= 4
-                    ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 shadow-amber-950/70 text-amber-100 ring-1 ring-amber-400/50'
+                    ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 text-amber-100 ring-1 ring-amber-400/50'
                     : lineAlert.isOpponent
                     ? isDateNight
-                      ? 'bg-gradient-to-r from-amber-950/90 via-rose-950/90 to-amber-900/80 border-amber-400/60 shadow-amber-950/60 text-amber-100'
+                      ? 'bg-gradient-to-r from-amber-950/90 via-rose-950/90 to-amber-900/80 border-amber-400/60 text-amber-100'
                       : 'bg-indigo-950/90 border-indigo-400/50 text-indigo-100'
                     : isDateNight
-                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/90 to-pink-950/90 border-rose-400/60 shadow-rose-950/60 text-rose-100'
+                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/90 to-pink-950/90 border-rose-400/60 text-rose-100'
                     : 'bg-emerald-950/90 border-emerald-400/50 text-emerald-100'
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base shrink-0">
                     {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
                   </span>
-                  <div>
-                    <div className="text-sm font-black tracking-tight leading-tight">
-                      {lineAlert.title}
-                    </div>
-                    <div className="text-xs opacity-90 leading-tight">
-                      {lineAlert.subtitle}
-                    </div>
+                  <div className="text-xs font-bold leading-tight truncate">
+                    {lineAlert.title.replace(/\s*\(Opponent: \d+\/5\)/, '')}
                   </div>
                 </div>
                 <div
-                  className={`text-xs font-mono font-bold px-3 py-1 rounded-full shrink-0 border ${
+                  className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ml-2 ${
                     lineAlert.isOpponent
                       ? 'bg-indigo-900/60 text-indigo-200 border-indigo-400/40'
                       : isDateNight
@@ -2487,33 +2482,27 @@ export default function App() {
                       : 'bg-emerald-900/60 text-emerald-200 border-emerald-400/40'
                   }`}
                 >
-                  {lineAlert.isOpponent ? `${lineAlert.senderName || opponentName}: ` : 'You: '}
-                  {lineAlert.count}/5
+                  {lineAlert.count}/5 lines
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* B-I-N-G-O Header Badges */}
-          <div className="flex flex-col items-center justify-center my-0.5">
-            <span className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-1">
-              Your B-I-N-G-O Lines ({completedLinesCount}/5)
-            </span>
-            <div className="flex items-center justify-center gap-2.5">
-              {BINGO_LETTERS.map((letter, index) => {
-                const isActive = completedLinesCount > index;
-                return (
-                  <motion.div
-                    key={letter}
-                    animate={isActive ? { scale: [1, 1.15, 1.06] } : { scale: 1 }}
-                    transition={{ duration: 0.35, ease: 'easeOut' }}
-                    className={`bingo-badge ${isActive ? 'active' : 'inactive'}`}
-                  >
-                    {letter}
-                  </motion.div>
-                );
-              })}
-            </div>
+          <div className="flex items-center justify-center gap-2.5 my-1">
+            {BINGO_LETTERS.map((letter, index) => {
+              const isActive = completedLinesCount > index;
+              return (
+                <motion.div
+                  key={letter}
+                  animate={isActive ? { scale: [1, 1.15, 1.06] } : { scale: 1 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className={`bingo-badge ${isActive ? 'active' : 'inactive'}`}
+                >
+                  {letter}
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* 5x5 Tactile Grid */}
@@ -2547,8 +2536,8 @@ export default function App() {
             })}
           </div>
 
-          {/* In-Game Floating Reactions Emote Bar (Date Night) */}
-          {isDateNight && (
+          {/* In-Game Floating Reactions Emote Bar (Date Night Multiplayer Only) */}
+          {isDateNight && isBoardLocked && role !== 'solo' && (
             <div className="flex items-center justify-center gap-2 py-0.5">
               <span className="text-xs font-bold text-rose-300 opacity-80">Send Love:</span>
               <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel border border-rose-500/30 shadow-md">
@@ -2600,43 +2589,29 @@ export default function App() {
               </div>
 
               {/* Action Helper Buttons */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleFillRandom}
-                  className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow ${
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow ${
                     isDateNight
                       ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
                   }`}
                   title="Fill remaining or all slots randomly"
                 >
-                  <Shuffle size={13} className={isDateNight ? 'text-rose-400' : 'text-indigo-400'} />
+                  <Shuffle size={14} className={isDateNight ? 'text-rose-400' : 'text-indigo-400'} />
                   <span>Random 🎲</span>
                 </motion.button>
 
                 <motion.button
                   whileTap={{ scale: 0.95 }}
-                  onClick={handleFillSequential}
-                  className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow ${
-                    isDateNight
-                      ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                  }`}
-                  title="Fill entire board 1 to 25 in order"
-                >
-                  <span className="font-mono text-xs font-black">1➔25</span>
-                  <span>In Order</span>
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
                   onClick={handleClearBoard}
-                  className="py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
+                  className="py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
                   title="Clear all numbers"
                 >
-                  <RotateCcw size={13} className="text-slate-400" />
-                  <span>Clear</span>
+                  <RotateCcw size={14} className="text-slate-400" />
+                  <span>Clear ↺</span>
                 </motion.button>
               </div>
 
@@ -2661,31 +2636,25 @@ export default function App() {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center min-h-[38px] my-1">
+            <div className="flex flex-col items-center justify-center min-h-[36px] my-1">
               {calledNumbers.length === 0 ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 py-1.5 px-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm font-semibold shadow-md">
-                    <Lock size={13} className="text-emerald-400" />
-                    <span>
-                      Board Locked & Ready!{' '}
-                      {isLocalTurn ? 'Your turn to call!' : `Waiting for ${opponentName}...`}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 py-1 px-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-md">
+                  <Lock size={13} className="text-emerald-400" />
+                  <span>
+                    Board Locked!{' '}
+                    {isLocalTurn ? 'Your turn to call a number!' : `Waiting for ${opponentName}...`}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 text-xs sm:text-sm font-semibold text-slate-400">
                   <span>
                     Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
                   </span>
-                  <span>•</span>
-                  <span>
-                    Your Lines: <strong className="text-amber-400">{completedLinesCount}</strong>/5
-                  </span>
                   {lastCalled && (
                     <>
                       <span>•</span>
                       <span>
-                        Last: <strong className="text-indigo-300">#{lastCalled}</strong>
+                        Last Call: <strong className="text-indigo-300">#{lastCalled}</strong>
                       </span>
                     </>
                   )}
