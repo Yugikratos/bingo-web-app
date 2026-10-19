@@ -142,33 +142,51 @@ export function playLineCompleteSound() {
 }
 
 /**
- * playKatanaSlashSound: Sharp energetic anime / katana slice audio
+ * playSweepSound: Gentle sweeping harmonic shimmer for Domino Wave & Meteor Ray
  */
-export function playKatanaSlashSound() {
+export function playSweepSound(isDateNight = false) {
   if (isMuted) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(1300, now);
-    osc.frequency.exponentialRampToValueAtTime(260, now + 0.16);
+    // Harmonic 1 (Base shimmer glissando: 440Hz -> 880Hz or 523Hz -> 1046Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    const startFreq = isDateNight ? 523.25 : 440; // C5 or A4
+    const endFreq = isDateNight ? 1046.50 : 880;  // C6 or A5
+    osc1.frequency.setValueAtTime(startFreq, now);
+    osc1.frequency.exponentialRampToValueAtTime(endFreq, now + 0.45);
 
-    gain.gain.setValueAtTime(0.26, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    gain1.gain.setValueAtTime(0.18, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.55);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    // Harmonic 2 (Ethereal overtone chime: 1318.5Hz -> 1760Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(startFreq * 2.5, now + 0.05);
+    osc2.frequency.exponentialRampToValueAtTime(endFreq * 2, now + 0.5);
 
-    osc.start(now);
-    osc.stop(now + 0.18);
+    gain2.gain.setValueAtTime(0.12, now + 0.05);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.05);
+    osc2.stop(now + 0.55);
   } catch (err) {
     // Graceful fallback
   }
 }
+
+// Backwards-compatible alias
+export const playKatanaSlashSound = playSweepSound;
 
 /**
  * 4. playWinFanfare: Triumphant 4-note arpeggio chord (C5 -> E5 -> G5 -> C6) when 5 lines are achieved

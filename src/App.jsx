@@ -32,12 +32,12 @@ import {
   ScrollText,
   Gift
 } from 'lucide-react';
-import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES } from './utils/bingoEngine';
+import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES, WIN_LINES, METEOR_LINE_COORDS } from './utils/bingoEngine';
 import {
   playTapSound,
   playOpponentTapSound,
   playLineCompleteSound,
-  playKatanaSlashSound,
+  playSweepSound,
   playWinFanfare,
   playShuffleSound,
   playRomanticChime,
@@ -48,30 +48,10 @@ import {
 import SplitText from './components/ui/SplitText';
 import RippleButton from './components/ui/RippleButton';
 import GlareCard from './components/ui/GlareCard';
+import MeteorRay from './components/ui/MeteorRay';
 
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
-
-// Katana Blade Slash Geometry (Double-tapered crescent curves in % of 5x5 grid)
-const KATANA_BLADE_DATA = {
-  // 5 Rows (0-4): y centers at 10, 30, 50, 70, 90
-  0: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,10 Q 50,7.2 98,10 Q 50,12.8 2,10 Z', corePath: 'M 3,10 Q 50,8.8 97,10 Q 50,11.2 3,10 Z', yNorm: 0.10 },
-  1: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,30 Q 50,27.2 98,30 Q 50,32.8 2,30 Z', corePath: 'M 3,30 Q 50,28.8 97,30 Q 50,31.2 3,30 Z', yNorm: 0.30 },
-  2: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,50 Q 50,47.2 98,50 Q 50,52.8 2,50 Z', corePath: 'M 3,50 Q 50,48.8 97,50 Q 50,51.2 3,50 Z', yNorm: 0.50 },
-  3: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,70 Q 50,67.2 98,70 Q 50,72.8 2,70 Z', corePath: 'M 3,70 Q 50,68.8 97,70 Q 50,71.2 3,70 Z', yNorm: 0.70 },
-  4: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,90 Q 50,87.2 98,90 Q 50,92.8 2,90 Z', corePath: 'M 3,90 Q 50,88.8 97,90 Q 50,91.2 3,90 Z', yNorm: 0.90 },
-
-  // 5 Columns (5-9): x centers at 10, 30, 50, 70, 90
-  5: { origin: '50% 0%', axis: 'col', outerPath: 'M 10,2 Q 7.2,50 10,98 Q 12.8,50 10,2 Z', corePath: 'M 10,3 Q 8.8,50 10,97 Q 11.2,50 10,3 Z', xNorm: 0.10 },
-  6: { origin: '50% 0%', axis: 'col', outerPath: 'M 30,2 Q 27.2,50 30,98 Q 32.8,50 30,2 Z', corePath: 'M 30,3 Q 28.8,50 30,97 Q 31.2,50 30,3 Z', xNorm: 0.30 },
-  7: { origin: '50% 0%', axis: 'col', outerPath: 'M 50,2 Q 47.2,50 50,98 Q 52.8,50 50,2 Z', corePath: 'M 50,3 Q 48.8,50 50,97 Q 51.2,50 50,3 Z', xNorm: 0.50 },
-  8: { origin: '50% 0%', axis: 'col', outerPath: 'M 70,2 Q 67.2,50 70,98 Q 72.8,50 70,2 Z', corePath: 'M 70,3 Q 68.8,50 70,97 Q 71.2,50 70,3 Z', xNorm: 0.70 },
-  9: { origin: '50% 0%', axis: 'col', outerPath: 'M 90,2 Q 87.2,50 90,98 Q 92.8,50 90,2 Z', corePath: 'M 90,3 Q 88.8,50 90,97 Q 91.2,50 90,3 Z', xNorm: 0.90 },
-
-  // 2 Diagonals: corner to corner
-  10: { origin: '0% 0%', axis: 'diag', outerPath: 'M 3,3 Q 52,47 97,97 Q 47,52 3,3 Z', corePath: 'M 4,4 Q 51,49 96,96 Q 49,51 4,4 Z', xNorm: 0.50, yNorm: 0.50 },
-  11: { origin: '100% 0%', axis: 'diag', outerPath: 'M 97,3 Q 53,52 3,97 Q 47,48 97,3 Z', corePath: 'M 96,4 Q 51,51 4,96 Q 49,49 96,4 Z', xNorm: 0.50, yNorm: 0.50 }
-};
 
 const WAGER_PRESETS = [
   '15-Min Massage 💆',
@@ -252,8 +232,9 @@ export default function App() {
   const [lineAlert, setLineAlert] = useState(null);
   const lineAlertTimeoutRef = useRef(null);
 
-  // Active Katana Blade Slashes & Sparkle Impact: [{ id, lineId }]
-  const [activeKatanaSlashes, setActiveKatanaSlashes] = useState([]);
+  // Active Meteor Rays & Staggered Domino Wave Tiles
+  const [activeMeteors, setActiveMeteors] = useState([]);
+  const [dominoTiles, setDominoTiles] = useState({}); // { [tileIndex]: positionInLine }
   const gridContainerRef = useRef(null);
   const shakeControls = useAnimation();
 
@@ -509,44 +490,44 @@ export default function App() {
     };
   }, []);
 
-  // Localized canvas-confetti blade impact spark burst precisely along slash axis
-  const triggerBladeSparks = useCallback((lineId) => {
-    const blade = KATANA_BLADE_DATA[lineId];
-    if (!blade) return;
+  // Soft Embers Particle Dispersal along Meteor Ray path
+  const triggerLineSparks = useCallback((lineId) => {
+    const coords = METEOR_LINE_COORDS[lineId];
+    if (!coords) return;
     const gridEl = gridContainerRef.current;
-    let originX = 0.5;
-    let originY = 0.5;
-    if (gridEl) {
-      const rect = gridEl.getBoundingClientRect();
-      if (blade.axis === 'row') {
-        originX = (rect.left + rect.width * 0.5) / window.innerWidth;
-        originY = (rect.top + rect.height * blade.yNorm) / window.innerHeight;
-      } else if (blade.axis === 'col') {
-        originX = (rect.left + rect.width * blade.xNorm) / window.innerWidth;
-        originY = (rect.top + rect.height * 0.5) / window.innerHeight;
-      } else {
-        originX = (rect.left + rect.width * blade.xNorm) / window.innerWidth;
-        originY = (rect.top + rect.height * blade.yNorm) / window.innerHeight;
-      }
-    }
+    if (!gridEl) return;
+    const rect = gridEl.getBoundingClientRect();
 
-    try {
-      confetti({
-        particleCount: 22,
-        spread: blade.axis === 'row' ? 60 : 45,
-        angle: blade.axis === 'col' ? 0 : 90,
-        startVelocity: 14,
-        origin: { x: originX, y: originY },
-        colors: isDateNight
-          ? ['#F43F5E', '#FBBF24', '#FEF08A', '#FFFFFF']
-          : ['#10B981', '#34D399', '#FBBF24', '#FFFFFF'],
-        ticks: 45,
-        shapes: ['star', 'circle'],
-        scalar: 0.65,
-        gravity: 0.85,
-        disableForReducedMotion: true
-      });
-    } catch (e) {}
+    const colors = isDateNight
+      ? ['#F43F5E', '#FDA4AF', '#FBBF24', '#FEF08A', '#FFFFFF']
+      : ['#10B981', '#6EE7B7', '#FBBF24', '#FEF08A', '#FFFFFF'];
+
+    // Fire 3 staggered gentle embers along the meteor path (start -> middle -> end) over 400ms
+    const points = [0.2, 0.5, 0.8];
+    points.forEach((progress, idx) => {
+      setTimeout(() => {
+        const xPct = (coords.x1 + (coords.x2 - coords.x1) * progress) / 100;
+        const yPct = (coords.y1 + (coords.y2 - coords.y1) * progress) / 100;
+
+        const originX = (rect.left + rect.width * xPct) / window.innerWidth;
+        const originY = (rect.top + rect.height * yPct) / window.innerHeight;
+
+        try {
+          confetti({
+            particleCount: 12,
+            spread: 40,
+            startVelocity: 15,
+            origin: { x: originX, y: originY },
+            colors,
+            ticks: 60,
+            gravity: 0.6,
+            scalar: 0.8,
+            shapes: ['circle', 'star'],
+            disableForReducedMotion: true
+          });
+        } catch (e) {}
+      }, idx * 160);
+    });
   }, [isDateNight]);
 
   // Track completed lines to play chime & trigger prominent banner
@@ -566,34 +547,46 @@ export default function App() {
       const lineNamesStr =
         newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
 
-      // Trigger Katana Blade Slash + Localized Star Sparkle Impact + Screen Shake
+      // Trigger Staggered Domino Wave + Meteor Ray Sweep + Soft Embers
       if (newlyCompletedIds.length > 0) {
-        playKatanaSlashSound();
+        playSweepSound(isDateNight);
         triggerHaptic([25, 40, 55]);
         shakeControls.start({
-          x: [0, -12, 14, -8, 8, -4, 4, 0],
+          x: [0, -6, 7, -4, 4, -2, 2, 0],
           transition: { duration: 0.35, ease: 'easeInOut' }
         });
+
+        // 1. Calculate 5 tile indices for newly completed line(s) for Staggered Domino Wave
+        const newDomino = {};
+        newlyCompletedIds.forEach((lineId) => {
+          const lineIndices = WIN_LINES[lineId];
+          if (lineIndices) {
+            lineIndices.forEach((tileIdx, pos) => {
+              if (newDomino[tileIdx] === undefined || pos < newDomino[tileIdx]) {
+                newDomino[tileIdx] = pos;
+              }
+            });
+          }
+        });
+        setDominoTiles(newDomino);
+        setTimeout(() => {
+          setDominoTiles({});
+        }, 1000);
+
+        // 2. Spawn Magic UI Meteor Ray Sweep(s)
         const timestamp = Date.now();
-        const newSlashes = newlyCompletedIds.map((lineId, i) => ({
+        const newMeteors = newlyCompletedIds.map((lineId, i) => ({
           id: `${timestamp}-${lineId}-${i}`,
           lineId
         }));
-        setActiveKatanaSlashes((prev) => [...prev, ...newSlashes]);
+        setActiveMeteors((prev) => [...prev, ...newMeteors]);
 
-        // Trigger sparks right as the blade cuts through
+        // 3. Fire Soft Embers particle dispersal along meteor ray path
         newlyCompletedIds.forEach((lineId, i) => {
           setTimeout(() => {
-            triggerBladeSparks(lineId);
-          }, 80 + i * 40);
+            triggerLineSparks(lineId);
+          }, i * 120);
         });
-
-        // Unmount blade immediately after slice completes (500ms)
-        setTimeout(() => {
-          setActiveKatanaSlashes((prev) =>
-            prev.filter((slash) => !newSlashes.some((ns) => ns.id === slash.id))
-          );
-        }, 500);
       }
 
       const title =
@@ -637,7 +630,7 @@ export default function App() {
     }
     prevCompletedLinesRef.current = completedLinesCount;
     prevCompletedLineIdsRef.current = completedLineIds || [];
-  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerBladeSparks, shakeControls]);
+  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerLineSparks, shakeControls]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -1199,7 +1192,8 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setActiveKatanaSlashes([]);
+    setActiveMeteors([]);
+    setDominoTiles({});
     shakeControls.set({ x: 0 });
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
@@ -1261,7 +1255,8 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setActiveKatanaSlashes([]);
+    setActiveMeteors([]);
+    setDominoTiles({});
     shakeControls.set({ x: 0 });
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
@@ -2678,6 +2673,8 @@ export default function App() {
                     const isCalled = !isEmpty && calledNumbers.includes(number);
                     const isWinning = !isEmpty && winningTileIndices.has(index);
                     const isLast = !isEmpty && lastCalled === number;
+                    const isNewlyCompleted = dominoTiles[index] !== undefined;
+                    const positionInLine = dominoTiles[index] ?? 0;
 
                     return (
                       <motion.button
@@ -2685,6 +2682,20 @@ export default function App() {
                         layout
                         layoutId={number !== null ? `tile-${number}` : undefined}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        animate={
+                          isNewlyCompleted
+                            ? {
+                                scale: [1, 1.15, 0.96, 1],
+                                rotateX: [0, -18, 8, 0],
+                                y: [0, -6, 2, 0],
+                                transition: {
+                                  duration: 0.55,
+                                  delay: positionInLine * 0.08,
+                                  ease: 'easeOut'
+                                }
+                              }
+                            : {}
+                        }
                         whileTap={
                           screen === 'playing' && !(isBoardLocked && isCalled)
                             ? { scale: 0.92, rotateX: 5, rotateY: -5, translateZ: -10 }
@@ -2710,87 +2721,18 @@ export default function App() {
                     );
                   })}
 
-                {/* Katana Blade Slash VFX Overlay */}
+                {/* Meteor Ray Sweep Overlay (Magic UI) */}
                 <AnimatePresence>
-                  {activeKatanaSlashes.length > 0 && (
-                    <svg
-                      viewBox="0 0 100 100"
-                      className="absolute inset-0 w-full h-full pointer-events-none z-30 overflow-visible"
-                    >
-                      <defs>
-                        {/* Date Night Katana Blade Gradient */}
-                        <linearGradient id="katana-grad-datenight" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.95" />
-                          <stop offset="50%" stopColor="#FBBF24" stopOpacity="1" />
-                          <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.95" />
-                        </linearGradient>
-
-                        {/* Standard Cyber Katana Blade Gradient */}
-                        <linearGradient id="katana-grad-standard" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#10B981" stopOpacity="0.95" />
-                          <stop offset="50%" stopColor="#6EE7B7" stopOpacity="1" />
-                          <stop offset="100%" stopColor="#10B981" stopOpacity="0.95" />
-                        </linearGradient>
-
-                        <filter id="katana-glow-datenight" x="-30%" y="-30%" width="160%" height="160%">
-                          <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#F43F5E" floodOpacity="0.95" />
-                          <feDropShadow dx="0" dy="0" stdDeviation="0.8" floodColor="#FEF08A" floodOpacity="0.95" />
-                        </filter>
-
-                        <filter id="katana-glow-standard" x="-30%" y="-30%" width="160%" height="160%">
-                          <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#10B981" floodOpacity="0.95" />
-                          <feDropShadow dx="0" dy="0" stdDeviation="0.8" floodColor="#A7F3D0" floodOpacity="0.95" />
-                        </filter>
-                      </defs>
-
-                      {activeKatanaSlashes.map((slash) => {
-                        const blade = KATANA_BLADE_DATA[slash.lineId];
-                        if (!blade) return null;
-
-                        const isRow = blade.axis === 'row';
-                        const isCol = blade.axis === 'col';
-
-                        return (
-                          <motion.g
-                            key={slash.id}
-                            style={{ transformOrigin: blade.origin }}
-                            initial={
-                              isRow
-                                ? { scaleX: 0, opacity: 0 }
-                                : isCol
-                                ? { scaleY: 0, opacity: 0 }
-                                : { scale: 0, opacity: 0 }
-                            }
-                            animate={
-                              isRow
-                                ? { scaleX: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
-                                : isCol
-                                ? { scaleY: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
-                                : { scale: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
-                            }
-                            transition={{
-                              duration: 0.42,
-                              times: [0, 0.52, 0.75, 1],
-                              ease: [0.16, 1, 0.3, 1]
-                            }}
-                            filter={isDateNight ? 'url(#katana-glow-datenight)' : 'url(#katana-glow-standard)'}
-                          >
-                            {/* Luminous Outer Double-Tapered Crescent Energy Blade */}
-                            <path
-                              d={blade.outerPath}
-                              fill={isDateNight ? 'url(#katana-grad-datenight)' : 'url(#katana-grad-standard)'}
-                            />
-                            {/* Razor-Sharp Blazing Core */}
-                            <path
-                              d={blade.corePath}
-                              fill={isDateNight ? '#FFFBEB' : '#F0FDF4'}
-                              opacity="0.95"
-                            />
-                          </motion.g>
-                        );
-                      })}
-                    </svg>
-                  )}
+                  {activeMeteors.map((meteor) => (
+                    <MeteorRay
+                      key={meteor.id}
+                      lineId={meteor.lineId}
+                      isDateNight={isDateNight}
+                      onComplete={() => {
+                        setActiveMeteors((prev) => prev.filter((m) => m.id !== meteor.id));
+                      }}
+                    />
+                  ))}
                 </AnimatePresence>
               </div>
             </motion.div>

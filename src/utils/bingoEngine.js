@@ -38,6 +38,29 @@ export const LINE_NAMES = [
 ];
 
 /**
+ * 12-line coordinate mapping for 5x5 Bingo Grid (percentages 0..100)
+ */
+export const METEOR_LINE_COORDS = {
+  // 5 Rows
+  0: { x1: 0, y1: 10, x2: 100, y2: 10, angle: 0 },
+  1: { x1: 0, y1: 30, x2: 100, y2: 30, angle: 0 },
+  2: { x1: 0, y1: 50, x2: 100, y2: 50, angle: 0 },
+  3: { x1: 0, y1: 70, x2: 100, y2: 70, angle: 0 },
+  4: { x1: 0, y1: 90, x2: 100, y2: 90, angle: 0 },
+
+  // 5 Columns
+  5: { x1: 10, y1: 0, x2: 10, y2: 100, angle: 90 },
+  6: { x1: 30, y1: 0, x2: 30, y2: 100, angle: 90 },
+  7: { x1: 50, y1: 0, x2: 50, y2: 100, angle: 90 },
+  8: { x1: 70, y1: 0, x2: 70, y2: 100, angle: 90 },
+  9: { x1: 90, y1: 0, x2: 90, y2: 100, angle: 90 },
+
+  // 2 Diagonals
+  10: { x1: 0, y1: 0, x2: 100, y2: 100, angle: 45 },
+  11: { x1: 100, y1: 0, x2: 0, y2: 100, angle: 135 }
+};
+
+/**
  * Generates an array of numbers 1..25 shuffled via Fisher-Yates algorithm
  */
 export function generateBoard() {
