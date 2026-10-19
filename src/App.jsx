@@ -103,9 +103,11 @@ export default function App() {
 
   // Date Night Wager / Stakes Selection (Freeform text)
   const [customWager, setCustomWager] = useState(() => {
-    return localStorage.getItem('bingo_date_night_wager') || '15-Min Massage 💆';
+    const saved = localStorage.getItem('bingo_date_night_wager');
+    if (!saved || saved === '15-Min Massage 💆') return '';
+    return saved;
   });
-  const activeWager = customWager.trim() || '15-Min Massage 💆';
+  const activeWager = customWager.trim() || 'Sweet Reward 💕';
 
   // Love Ledger / Date Night Wager Debts History
   const [wagerHistory, setWagerHistory] = useState(() => {
@@ -678,7 +680,7 @@ export default function App() {
           winnerName: winnerLabel,
           loserName: loserLabel,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
-          wager: curActiveWager || '15-Min Massage 💆',
+          wager: curActiveWager || 'Sweet Reward 💕',
           status: 'pending'
         };
 
@@ -2001,14 +2003,26 @@ export default function App() {
                 <span className="text-[9px] text-amber-300 font-bold">Prize at stake</span>
               </div>
 
-              <input
-                type="text"
-                maxLength={45}
-                value={customWager}
-                onChange={(e) => handleWagerChange(e.target.value)}
-                placeholder="What must the loser do? (e.g. 15-min massage, cook dinner, kisses)..."
-                className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl px-3 py-2 text-xs font-semibold text-white placeholder-slate-500 outline-none transition shadow-inner"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  maxLength={45}
+                  value={customWager}
+                  onChange={(e) => handleWagerChange(e.target.value)}
+                  placeholder="Type wager here... (e.g. 15-min massage, cook dinner, kisses)"
+                  className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl pl-3 pr-8 py-2 text-xs font-semibold text-white placeholder-slate-400 outline-none transition shadow-inner"
+                />
+                {customWager && (
+                  <button
+                    type="button"
+                    onClick={() => handleWagerChange('')}
+                    className="absolute right-2.5 w-4 h-4 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold transition"
+                    title="Clear"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               <p className="text-[9.5px] text-slate-400">
                 Type any penalty or bet — winner takes all! 💕
               </p>
