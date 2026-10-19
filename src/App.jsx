@@ -37,6 +37,7 @@ import {
   playTapSound,
   playOpponentTapSound,
   playLineCompleteSound,
+  playKatanaSlashSound,
   playWinFanfare,
   playShuffleSound,
   playRomanticChime,
@@ -47,6 +48,27 @@ import {
 
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
+
+// Katana Blade Slash Geometry (Double-tapered crescent curves in % of 5x5 grid)
+const KATANA_BLADE_DATA = {
+  // 5 Rows (0-4): y centers at 10, 30, 50, 70, 90
+  0: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,10 Q 50,7.2 98,10 Q 50,12.8 2,10 Z', corePath: 'M 3,10 Q 50,8.8 97,10 Q 50,11.2 3,10 Z', yNorm: 0.10 },
+  1: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,30 Q 50,27.2 98,30 Q 50,32.8 2,30 Z', corePath: 'M 3,30 Q 50,28.8 97,30 Q 50,31.2 3,30 Z', yNorm: 0.30 },
+  2: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,50 Q 50,47.2 98,50 Q 50,52.8 2,50 Z', corePath: 'M 3,50 Q 50,48.8 97,50 Q 50,51.2 3,50 Z', yNorm: 0.50 },
+  3: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,70 Q 50,67.2 98,70 Q 50,72.8 2,70 Z', corePath: 'M 3,70 Q 50,68.8 97,70 Q 50,71.2 3,70 Z', yNorm: 0.70 },
+  4: { origin: '0% 50%', axis: 'row', outerPath: 'M 2,90 Q 50,87.2 98,90 Q 50,92.8 2,90 Z', corePath: 'M 3,90 Q 50,88.8 97,90 Q 50,91.2 3,90 Z', yNorm: 0.90 },
+
+  // 5 Columns (5-9): x centers at 10, 30, 50, 70, 90
+  5: { origin: '50% 0%', axis: 'col', outerPath: 'M 10,2 Q 7.2,50 10,98 Q 12.8,50 10,2 Z', corePath: 'M 10,3 Q 8.8,50 10,97 Q 11.2,50 10,3 Z', xNorm: 0.10 },
+  6: { origin: '50% 0%', axis: 'col', outerPath: 'M 30,2 Q 27.2,50 30,98 Q 32.8,50 30,2 Z', corePath: 'M 30,3 Q 28.8,50 30,97 Q 31.2,50 30,3 Z', xNorm: 0.30 },
+  7: { origin: '50% 0%', axis: 'col', outerPath: 'M 50,2 Q 47.2,50 50,98 Q 52.8,50 50,2 Z', corePath: 'M 50,3 Q 48.8,50 50,97 Q 51.2,50 50,3 Z', xNorm: 0.50 },
+  8: { origin: '50% 0%', axis: 'col', outerPath: 'M 70,2 Q 67.2,50 70,98 Q 72.8,50 70,2 Z', corePath: 'M 70,3 Q 68.8,50 70,97 Q 71.2,50 70,3 Z', xNorm: 0.70 },
+  9: { origin: '50% 0%', axis: 'col', outerPath: 'M 90,2 Q 87.2,50 90,98 Q 92.8,50 90,2 Z', corePath: 'M 90,3 Q 88.8,50 90,97 Q 91.2,50 90,3 Z', xNorm: 0.90 },
+
+  // 2 Diagonals: corner to corner
+  10: { origin: '0% 0%', axis: 'diag', outerPath: 'M 3,3 Q 52,47 97,97 Q 47,52 3,3 Z', corePath: 'M 4,4 Q 51,49 96,96 Q 49,51 4,4 Z', xNorm: 0.50, yNorm: 0.50 },
+  11: { origin: '100% 0%', axis: 'diag', outerPath: 'M 97,3 Q 53,52 3,97 Q 47,48 97,3 Z', corePath: 'M 96,4 Q 51,51 4,96 Q 49,49 96,4 Z', xNorm: 0.50, yNorm: 0.50 }
+};
 
 const WAGER_PRESETS = [
   '15-Min Massage 💆',
@@ -226,6 +248,10 @@ export default function App() {
   // Prominent Line Alert Banner (shows when either player claims a line and stays for ~5s)
   const [lineAlert, setLineAlert] = useState(null);
   const lineAlertTimeoutRef = useRef(null);
+
+  // Active Katana Blade Slashes & Sparkle Impact: [{ id, lineId }]
+  const [activeKatanaSlashes, setActiveKatanaSlashes] = useState([]);
+  const gridContainerRef = useRef(null);
 
   // Persistent Head-to-Head Stats
   const [stats, setStats] = useState(() => {
@@ -479,6 +505,46 @@ export default function App() {
     };
   }, []);
 
+  // Localized canvas-confetti blade impact spark burst precisely along slash axis
+  const triggerBladeSparks = useCallback((lineId) => {
+    const blade = KATANA_BLADE_DATA[lineId];
+    if (!blade) return;
+    const gridEl = gridContainerRef.current;
+    let originX = 0.5;
+    let originY = 0.5;
+    if (gridEl) {
+      const rect = gridEl.getBoundingClientRect();
+      if (blade.axis === 'row') {
+        originX = (rect.left + rect.width * 0.5) / window.innerWidth;
+        originY = (rect.top + rect.height * blade.yNorm) / window.innerHeight;
+      } else if (blade.axis === 'col') {
+        originX = (rect.left + rect.width * blade.xNorm) / window.innerWidth;
+        originY = (rect.top + rect.height * 0.5) / window.innerHeight;
+      } else {
+        originX = (rect.left + rect.width * blade.xNorm) / window.innerWidth;
+        originY = (rect.top + rect.height * blade.yNorm) / window.innerHeight;
+      }
+    }
+
+    try {
+      confetti({
+        particleCount: 22,
+        spread: blade.axis === 'row' ? 60 : 45,
+        angle: blade.axis === 'col' ? 0 : 90,
+        startVelocity: 14,
+        origin: { x: originX, y: originY },
+        colors: isDateNight
+          ? ['#F43F5E', '#FBBF24', '#FEF08A', '#FFFFFF']
+          : ['#10B981', '#34D399', '#FBBF24', '#FFFFFF'],
+        ticks: 45,
+        shapes: ['star', 'circle'],
+        scalar: 0.65,
+        gravity: 0.85,
+        disableForReducedMotion: true
+      });
+    } catch (e) {}
+  }, [isDateNight]);
+
   // Track completed lines to play chime & trigger prominent banner
   useEffect(() => {
     if (isBoardLocked && completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
@@ -496,6 +562,31 @@ export default function App() {
       const lineNamesStr =
         newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
 
+      // Trigger Katana Blade Slash + Localized Star Sparkle Impact
+      if (newlyCompletedIds.length > 0) {
+        playKatanaSlashSound();
+        triggerHaptic([25, 40, 55]);
+        const timestamp = Date.now();
+        const newSlashes = newlyCompletedIds.map((lineId, i) => ({
+          id: `${timestamp}-${lineId}-${i}`,
+          lineId
+        }));
+        setActiveKatanaSlashes((prev) => [...prev, ...newSlashes]);
+
+        // Trigger sparks right as the blade cuts through
+        newlyCompletedIds.forEach((lineId, i) => {
+          setTimeout(() => {
+            triggerBladeSparks(lineId);
+          }, 80 + i * 40);
+        });
+
+        // Unmount blade immediately after slice completes (500ms)
+        setTimeout(() => {
+          setActiveKatanaSlashes((prev) =>
+            prev.filter((slash) => !newSlashes.some((ns) => ns.id === slash.id))
+          );
+        }, 500);
+      }
 
       const title =
         completedLinesCount >= 5
@@ -538,7 +629,7 @@ export default function App() {
     }
     prevCompletedLinesRef.current = completedLinesCount;
     prevCompletedLineIdsRef.current = completedLineIds || [];
-  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert]);
+  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerBladeSparks]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -1100,6 +1191,7 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
+    setActiveKatanaSlashes([]);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     const nextRound = roundNum || currentRoundRef.current + 1;
@@ -1160,6 +1252,7 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
+    setActiveKatanaSlashes([]);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setScreen('playing');
@@ -2565,7 +2658,7 @@ export default function App() {
           {/* 5x5 Tactile Grid with Spring Flying Tiles Physics */}
           <LayoutGroup id="bingo-setup-group">
             <div className="relative w-full max-w-[420px] mx-auto my-auto">
-              <div className="bingo-grid w-full">
+              <div ref={gridContainerRef} className="bingo-grid w-full">
                 {board.map((number, index) => {
                   const isEmpty = number === null;
                   const isCalled = !isEmpty && calledNumbers.includes(number);
@@ -2597,6 +2690,89 @@ export default function App() {
                     </motion.button>
                   );
                 })}
+
+                {/* Katana Blade Slash VFX Overlay */}
+                <AnimatePresence>
+                  {activeKatanaSlashes.length > 0 && (
+                    <svg
+                      viewBox="0 0 100 100"
+                      className="absolute inset-0 w-full h-full pointer-events-none z-30 overflow-visible"
+                    >
+                      <defs>
+                        {/* Date Night Katana Blade Gradient */}
+                        <linearGradient id="katana-grad-datenight" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.95" />
+                          <stop offset="50%" stopColor="#FBBF24" stopOpacity="1" />
+                          <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.95" />
+                        </linearGradient>
+
+                        {/* Standard Cyber Katana Blade Gradient */}
+                        <linearGradient id="katana-grad-standard" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#10B981" stopOpacity="0.95" />
+                          <stop offset="50%" stopColor="#6EE7B7" stopOpacity="1" />
+                          <stop offset="100%" stopColor="#10B981" stopOpacity="0.95" />
+                        </linearGradient>
+
+                        <filter id="katana-glow-datenight" x="-30%" y="-30%" width="160%" height="160%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#F43F5E" floodOpacity="0.95" />
+                          <feDropShadow dx="0" dy="0" stdDeviation="0.8" floodColor="#FEF08A" floodOpacity="0.95" />
+                        </filter>
+
+                        <filter id="katana-glow-standard" x="-30%" y="-30%" width="160%" height="160%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="2.4" floodColor="#10B981" floodOpacity="0.95" />
+                          <feDropShadow dx="0" dy="0" stdDeviation="0.8" floodColor="#A7F3D0" floodOpacity="0.95" />
+                        </filter>
+                      </defs>
+
+                      {activeKatanaSlashes.map((slash) => {
+                        const blade = KATANA_BLADE_DATA[slash.lineId];
+                        if (!blade) return null;
+
+                        const isRow = blade.axis === 'row';
+                        const isCol = blade.axis === 'col';
+
+                        return (
+                          <motion.g
+                            key={slash.id}
+                            style={{ transformOrigin: blade.origin }}
+                            initial={
+                              isRow
+                                ? { scaleX: 0, opacity: 0 }
+                                : isCol
+                                ? { scaleY: 0, opacity: 0 }
+                                : { scale: 0, opacity: 0 }
+                            }
+                            animate={
+                              isRow
+                                ? { scaleX: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
+                                : isCol
+                                ? { scaleY: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
+                                : { scale: [0, 1.05, 1, 1], opacity: [0, 1, 0.95, 0] }
+                            }
+                            transition={{
+                              duration: 0.42,
+                              times: [0, 0.52, 0.75, 1],
+                              ease: [0.16, 1, 0.3, 1]
+                            }}
+                            filter={isDateNight ? 'url(#katana-glow-datenight)' : 'url(#katana-glow-standard)'}
+                          >
+                            {/* Luminous Outer Double-Tapered Crescent Energy Blade */}
+                            <path
+                              d={blade.outerPath}
+                              fill={isDateNight ? 'url(#katana-grad-datenight)' : 'url(#katana-grad-standard)'}
+                            />
+                            {/* Razor-Sharp Blazing Core */}
+                            <path
+                              d={blade.corePath}
+                              fill={isDateNight ? '#FFFBEB' : '#F0FDF4'}
+                              opacity="0.95"
+                            />
+                          </motion.g>
+                        );
+                      })}
+                    </svg>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 

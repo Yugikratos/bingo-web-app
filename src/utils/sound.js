@@ -142,6 +142,35 @@ export function playLineCompleteSound() {
 }
 
 /**
+ * playKatanaSlashSound: Sharp energetic anime / katana slice audio
+ */
+export function playKatanaSlashSound() {
+  if (isMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1300, now);
+    osc.frequency.exponentialRampToValueAtTime(260, now + 0.16);
+
+    gain.gain.setValueAtTime(0.26, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.18);
+  } catch (err) {
+    // Graceful fallback
+  }
+}
+
+/**
  * 4. playWinFanfare: Triumphant 4-note arpeggio chord (C5 -> E5 -> G5 -> C6) when 5 lines are achieved
  */
 export function playWinFanfare() {
