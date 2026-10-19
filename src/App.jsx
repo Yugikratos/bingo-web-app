@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup, useAnimation } from 'framer-motion';
 import { Peer } from 'peerjs';
 import confetti from 'canvas-confetti';
 import {
@@ -252,6 +252,7 @@ export default function App() {
   // Active Katana Blade Slashes & Sparkle Impact: [{ id, lineId }]
   const [activeKatanaSlashes, setActiveKatanaSlashes] = useState([]);
   const gridContainerRef = useRef(null);
+  const shakeControls = useAnimation();
 
   // Persistent Head-to-Head Stats
   const [stats, setStats] = useState(() => {
@@ -562,10 +563,14 @@ export default function App() {
       const lineNamesStr =
         newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
 
-      // Trigger Katana Blade Slash + Localized Star Sparkle Impact
+      // Trigger Katana Blade Slash + Localized Star Sparkle Impact + Screen Shake
       if (newlyCompletedIds.length > 0) {
         playKatanaSlashSound();
         triggerHaptic([25, 40, 55]);
+        shakeControls.start({
+          x: [0, -12, 14, -8, 8, -4, 4, 0],
+          transition: { duration: 0.35, ease: 'easeInOut' }
+        });
         const timestamp = Date.now();
         const newSlashes = newlyCompletedIds.map((lineId, i) => ({
           id: `${timestamp}-${lineId}-${i}`,
@@ -629,7 +634,7 @@ export default function App() {
     }
     prevCompletedLinesRef.current = completedLinesCount;
     prevCompletedLineIdsRef.current = completedLineIds || [];
-  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerBladeSparks]);
+  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerBladeSparks, shakeControls]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
@@ -1192,6 +1197,7 @@ export default function App() {
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
     setActiveKatanaSlashes([]);
+    shakeControls.set({ x: 0 });
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     const nextRound = roundNum || currentRoundRef.current + 1;
@@ -1253,6 +1259,7 @@ export default function App() {
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
     setActiveKatanaSlashes([]);
+    shakeControls.set({ x: 0 });
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setScreen('playing');
@@ -2658,38 +2665,48 @@ export default function App() {
           {/* 5x5 Tactile Grid with Spring Flying Tiles Physics */}
           <LayoutGroup id="bingo-setup-group">
             <div className="relative w-full max-w-[420px] mx-auto my-auto">
-              <div ref={gridContainerRef} className="bingo-grid w-full">
-                {board.map((number, index) => {
-                  const isEmpty = number === null;
-                  const isCalled = !isEmpty && calledNumbers.includes(number);
-                  const isWinning = !isEmpty && winningTileIndices.has(index);
-                  const isLast = !isEmpty && lastCalled === number;
+              <motion.div animate={shakeControls} className="w-full">
+                <div
+                  ref={gridContainerRef}
+                  className="bingo-grid w-full"
+                  style={{ perspective: 1000 }}
+                >
+                  {board.map((number, index) => {
+                    const isEmpty = number === null;
+                    const isCalled = !isEmpty && calledNumbers.includes(number);
+                    const isWinning = !isEmpty && winningTileIndices.has(index);
+                    const isLast = !isEmpty && lastCalled === number;
 
-                  return (
-                    <motion.button
-                      key={index}
-                      layout
-                      layoutId={number !== null ? `tile-${number}` : undefined}
-                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      whileTap={screen === 'playing' && !(isBoardLocked && isCalled) ? { scale: 0.88 } : {}}
-                      disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
-                      onClick={() => handleTileClick(index)}
-                      className={`bingo-tile ${
-                        isEmpty
-                          ? 'empty'
-                          : isWinning
-                          ? 'winning'
-                          : isCalled
-                          ? 'called'
-                          : 'uncalled'
-                      }`}
-                    >
-                      {/* Last Called Pulse Ring */}
-                      {isLast && <div className="last-called-ring" />}
-                      <span>{isEmpty ? '' : number}</span>
-                    </motion.button>
-                  );
-                })}
+                    return (
+                      <motion.button
+                        key={index}
+                        layout
+                        layoutId={number !== null ? `tile-${number}` : undefined}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        whileTap={
+                          screen === 'playing' && !(isBoardLocked && isCalled)
+                            ? { scale: 0.92, rotateX: 5, rotateY: -5, translateZ: -10 }
+                            : undefined
+                        }
+                        disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
+                        onClick={() => handleTileClick(index)}
+                        className={`bingo-tile ${
+                          isEmpty
+                            ? 'empty'
+                            : isWinning
+                            ? 'winning'
+                            : isCalled
+                            ? 'called'
+                            : 'uncalled'
+                        }`}
+                        style={{ transformStyle: 'preserve-3d' }}
+                      >
+                        {/* Last Called Pulse Ring */}
+                        {isLast && <div className="last-called-ring" />}
+                        <span>{isEmpty ? '' : number}</span>
+                      </motion.button>
+                    );
+                  })}
 
                 {/* Katana Blade Slash VFX Overlay */}
                 <AnimatePresence>
@@ -2774,7 +2791,8 @@ export default function App() {
                   )}
                 </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
+          </div>
 
           {/* In-Game Floating Reactions Emote Bar (Date Night Multiplayer Only) */}
           {isDateNight && isBoardLocked && role !== 'solo' && (
