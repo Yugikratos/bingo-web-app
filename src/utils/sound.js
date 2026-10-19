@@ -142,35 +142,6 @@ export function playLineCompleteSound() {
 }
 
 /**
- * playLineSlashSound: Fast, energetic swoosh-cut sound when a line is sliced
- */
-export function playLineSlashSound() {
-  if (isMuted) return;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(1100, now);
-    osc.frequency.exponentialRampToValueAtTime(240, now + 0.14);
-
-    gain.gain.setValueAtTime(0.28, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.15);
-  } catch (err) {
-    // Graceful fallback
-  }
-}
-
-/**
  * 4. playWinFanfare: Triumphant 4-note arpeggio chord (C5 -> E5 -> G5 -> C6) when 5 lines are achieved
  */
 export function playWinFanfare() {

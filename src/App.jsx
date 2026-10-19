@@ -37,7 +37,6 @@ import {
   playTapSound,
   playOpponentTapSound,
   playLineCompleteSound,
-  playLineSlashSound,
   playWinFanfare,
   playShuffleSound,
   playRomanticChime,
@@ -48,27 +47,6 @@ import {
 
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
-
-// 12-Line Grid Coordinates for Dynamic Slash Cut Animation (center-through-center in % of 5x5 grid)
-const SLASH_LINE_COORDINATES = {
-  // 5 Rows: left-to-right through row center (y: 10, 30, 50, 70, 90)
-  0: { x1: 2, y1: 10, x2: 98, y2: 10 },
-  1: { x1: 2, y1: 30, x2: 98, y2: 30 },
-  2: { x1: 2, y1: 50, x2: 98, y2: 50 },
-  3: { x1: 2, y1: 70, x2: 98, y2: 70 },
-  4: { x1: 2, y1: 90, x2: 98, y2: 90 },
-
-  // 5 Columns: top-to-bottom through column center (x: 10, 30, 50, 70, 90)
-  5: { x1: 10, y1: 2, x2: 10, y2: 98 },
-  6: { x1: 30, y1: 2, x2: 30, y2: 98 },
-  7: { x1: 50, y1: 2, x2: 50, y2: 98 },
-  8: { x1: 70, y1: 2, x2: 70, y2: 98 },
-  9: { x1: 90, y1: 2, x2: 90, y2: 98 },
-
-  // 2 Diagonals: corner to corner
-  10: { x1: 4, y1: 4, x2: 96, y2: 96 }, // Top-left to bottom-right
-  11: { x1: 96, y1: 4, x2: 4, y2: 96 }  // Top-right to bottom-left
-};
 
 const WAGER_PRESETS = [
   '15-Min Massage 💆',
@@ -195,9 +173,6 @@ export default function App() {
   // Prominent Line Alert Banner (shows when either player claims a line and stays for ~5s)
   const [lineAlert, setLineAlert] = useState(null);
   const lineAlertTimeoutRef = useRef(null);
-
-  // Dynamic Line Slash Cuts (Option B: swift cut animation on line completion)
-  const [activeSlashes, setActiveSlashes] = useState([]);
 
   // Persistent Head-to-Head Stats
   const [stats, setStats] = useState(() => {
@@ -468,23 +443,6 @@ export default function App() {
       const lineNamesStr =
         newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
 
-      // Trigger dynamic line slash cut animation (Option B)
-      if (newlyCompletedIds.length > 0) {
-        playLineSlashSound();
-        triggerHaptic([25, 35, 50]);
-        const timestamp = Date.now();
-        const newSlashes = newlyCompletedIds.map((lineId, i) => ({
-          id: `${timestamp}-${lineId}-${i}`,
-          lineId
-        }));
-        setActiveSlashes((prev) => [...prev, ...newSlashes]);
-
-        setTimeout(() => {
-          setActiveSlashes((prev) =>
-            prev.filter((slash) => !newSlashes.some((ns) => ns.id === slash.id))
-          );
-        }, 850);
-      }
 
       const title =
         completedLinesCount >= 5
@@ -1089,7 +1047,6 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setActiveSlashes([]);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     const nextRound = roundNum || currentRoundRef.current + 1;
@@ -1150,7 +1107,6 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setActiveSlashes([]);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setScreen('playing');
@@ -2584,76 +2540,6 @@ export default function App() {
                   </motion.button>
                 );
               })}
-
-              {/* Dynamic Line Slash Cuts (Option B: swift cut animation on line completion) */}
-              <AnimatePresence>
-                {activeSlashes.length > 0 && (
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible"
-                  >
-                    <defs>
-                      <filter id="slash-glow-date" x="-25%" y="-25%" width="150%" height="150%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="1.8" floodColor="#F43F5E" floodOpacity="0.85" />
-                      </filter>
-                      <filter id="slash-glow-std" x="-25%" y="-25%" width="150%" height="150%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="1.8" floodColor="#10B981" floodOpacity="0.85" />
-                      </filter>
-                    </defs>
-                    {activeSlashes.map((slash) => {
-                      const coords = SLASH_LINE_COORDINATES[slash.lineId];
-                      if (!coords) return null;
-                      return (
-                        <g
-                          key={slash.id}
-                          filter={isDateNight ? 'url(#slash-glow-date)' : 'url(#slash-glow-std)'}
-                        >
-                          {/* Neon outer slash body */}
-                          <motion.line
-                            x1={coords.x1}
-                            y1={coords.y1}
-                            x2={coords.x2}
-                            y2={coords.y2}
-                            stroke={isDateNight ? '#FB7185' : '#34D399'}
-                            strokeWidth="4.8"
-                            strokeLinecap="round"
-                            initial={{ pathLength: 0, opacity: 0 }}
-                            animate={{
-                              pathLength: [0, 1, 1],
-                              opacity: [0, 1, 0.9, 0]
-                            }}
-                            transition={{
-                              duration: 0.6,
-                              times: [0, 0.35, 0.65, 1],
-                              ease: 'easeOut'
-                            }}
-                          />
-                          {/* Razor-bright inner blade core */}
-                          <motion.line
-                            x1={coords.x1}
-                            y1={coords.y1}
-                            x2={coords.x2}
-                            y2={coords.y2}
-                            stroke={isDateNight ? '#FFF1F2' : '#F0FDF4'}
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            initial={{ pathLength: 0, opacity: 0 }}
-                            animate={{
-                              pathLength: [0, 1, 1],
-                              opacity: [0, 1, 0]
-                            }}
-                            transition={{
-                              duration: 0.6,
-                              times: [0, 0.35, 0.65, 1],
-                              ease: 'easeOut'
-                            }}
-                          />
-                        </g>
-                      );
-                    })}
-                  </svg>
-                )}
-              </AnimatePresence>
             </div>
 
           </div>
