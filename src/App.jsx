@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Peer } from 'peerjs';
 import confetti from 'canvas-confetti';
 import {
@@ -76,6 +76,59 @@ function getTargetWins(seriesLength) {
   if (seriesLength === 7) return 4;
   if (seriesLength === 10) return 6;
   return Math.ceil(seriesLength / 2);
+}
+// 20 Floating Champagne Particles for Date Night Mode
+const CHAMPAGNE_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  size: 3 + ((i * 7) % 5), // 3px to 7px
+  left: `${((i * 19 + 7) % 92) + 4}%`, // 4% to 96%
+  drift: ((i * 11) % 36) - 18, // -18px to +18px
+  duration: 10 + ((i * 3.7) % 10), // 10s to 20s
+  delay: (i * 0.7) % 12 // staggered delay 0s to 12s
+}));
+
+function FloatingParticles() {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {CHAMPAGNE_PARTICLES.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full bg-rose-400/20 shadow-[0_0_8px_rgba(251,191,36,0.3)]"
+          style={{
+            width: p.size,
+            height: p.size,
+            left: p.left,
+            bottom: 0
+          }}
+          animate={{
+            y: ['100vh', '-10vh'],
+            x: [0, p.drift, -p.drift, 0],
+            opacity: [0, 0.8, 0.9, 0.4, 0]
+          }}
+          transition={{
+            y: {
+              duration: p.duration,
+              repeat: Infinity,
+              ease: 'linear',
+              delay: p.delay
+            },
+            x: {
+              duration: p.duration * 0.5,
+              repeat: Infinity,
+              repeatType: 'mirror',
+              ease: 'easeInOut'
+            },
+            opacity: {
+              duration: p.duration,
+              repeat: Infinity,
+              times: [0, 0.15, 0.5, 0.85, 1],
+              delay: p.delay
+            }
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 const DEFAULT_STATS = {
@@ -1745,6 +1798,7 @@ export default function App() {
       <div className="ambient-glow-wrapper">
         <div className="glow-orb-top-left" />
         <div className="glow-orb-bottom-right" />
+        {isDateNight && <FloatingParticles />}
       </div>
 
       {/* Floating Reaction Emotes */}
@@ -2508,41 +2562,43 @@ export default function App() {
             })}
           </div>
 
-          {/* 5x5 Tactile Grid with Laser Strike & Floating Micro-Popups */}
-          <div className="relative w-full max-w-[420px] mx-auto my-auto">
-            <div className="bingo-grid w-full">
-              {board.map((number, index) => {
-                const isEmpty = number === null;
-                const isCalled = !isEmpty && calledNumbers.includes(number);
-                const isWinning = !isEmpty && winningTileIndices.has(index);
-                const isLast = !isEmpty && lastCalled === number;
+          {/* 5x5 Tactile Grid with Spring Flying Tiles Physics */}
+          <LayoutGroup id="bingo-setup-group">
+            <div className="relative w-full max-w-[420px] mx-auto my-auto">
+              <div className="bingo-grid w-full">
+                {board.map((number, index) => {
+                  const isEmpty = number === null;
+                  const isCalled = !isEmpty && calledNumbers.includes(number);
+                  const isWinning = !isEmpty && winningTileIndices.has(index);
+                  const isLast = !isEmpty && lastCalled === number;
 
-                return (
-                  <motion.button
-                    key={index}
-                    whileTap={screen === 'playing' && !(isBoardLocked && isCalled) ? { scale: 0.88 } : {}}
-                    transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-                    disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
-                    onClick={() => handleTileClick(index)}
-                    className={`bingo-tile ${
-                      isEmpty
-                        ? 'empty'
-                        : isWinning
-                        ? 'winning'
-                        : isCalled
-                        ? 'called'
-                        : 'uncalled'
-                    }`}
-                  >
-                    {/* Last Called Pulse Ring */}
-                    {isLast && <div className="last-called-ring" />}
-                    <span>{isEmpty ? '' : number}</span>
-                  </motion.button>
-                );
-              })}
+                  return (
+                    <motion.button
+                      key={index}
+                      layout
+                      layoutId={number !== null ? `tile-${number}` : undefined}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      whileTap={screen === 'playing' && !(isBoardLocked && isCalled) ? { scale: 0.88 } : {}}
+                      disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
+                      onClick={() => handleTileClick(index)}
+                      className={`bingo-tile ${
+                        isEmpty
+                          ? 'empty'
+                          : isWinning
+                          ? 'winning'
+                          : isCalled
+                          ? 'called'
+                          : 'uncalled'
+                      }`}
+                    >
+                      {/* Last Called Pulse Ring */}
+                      {isLast && <div className="last-called-ring" />}
+                      <span>{isEmpty ? '' : number}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
             </div>
-
-          </div>
 
           {/* In-Game Floating Reactions Emote Bar (Date Night Multiplayer Only) */}
           {isDateNight && isBoardLocked && role !== 'solo' && (
@@ -2584,9 +2640,13 @@ export default function App() {
                     }`}
                   >
                     <span>Next on tap:</span>
-                    <span className="font-mono text-sm underline font-black">
+                    <motion.span
+                      layoutId={`tile-${nextSequentialNumber}`}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      className="font-mono text-sm underline font-black"
+                    >
                       #{nextSequentialNumber}
-                    </span>
+                    </motion.span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
@@ -2680,6 +2740,7 @@ export default function App() {
               )}
             </div>
           )}
+          </LayoutGroup>
         </div>
       )}
 
@@ -2833,7 +2894,7 @@ export default function App() {
                   </div>
                   <div className="text-sm font-bold text-white">
                     {seriesWinnerInfo.name} wins:{' '}
-                    <span className="text-amber-400 font-black">
+                    <span className="shimmer-text font-black">
                       {seriesWinnerInfo.wager || activeWager}
                     </span>
                   </div>
@@ -3097,7 +3158,7 @@ export default function App() {
                                 className={`text-sm font-bold leading-snug block ${
                                   item.status === 'fulfilled'
                                     ? 'line-through text-slate-400'
-                                    : 'text-white'
+                                    : 'shimmer-text font-black'
                                 }`}
                               >
                                 {item.wager}
@@ -3196,7 +3257,7 @@ export default function App() {
               <div className="text-center space-y-1 pt-1">
                 <div className="text-xs font-extrabold text-slate-800 flex items-center justify-center gap-1">
                   <span>Prize:</span>
-                  <span className="text-rose-600 font-black">
+                  <span className="shimmer-text font-black text-sm">
                     {seriesWinnerInfo.wager || activeWager}
                   </span>
                 </div>

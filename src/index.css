@@ -366,3 +366,19 @@ html, body {
 * {
   scrollbar-width: none;
 }
+
+/* Shimmering Gold Foil Victory Text */
+.shimmer-text {
+  background: linear-gradient(110deg, #FBBF24 10%, #FEF08A 30%, #FBBF24 50%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% center;
+  }
+}

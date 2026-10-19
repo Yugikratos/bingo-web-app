@@ -1,299 +1,166 @@
-# BINGO // 25 — Real-time P2P Multiplayer Web App
-> A production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile and desktop browsers with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset Web Audio synthesis, Best-of Series match engine, exclusive Date Night Mode (Yugi & Renia), persistent head-to-head stats tracking, and an intelligent AI practice bot.
+# BINGO // 25 — Real-Time P2P Multiplayer Web App
+
+> A production-ready, zero-backend 1–25 Classic Multiplayer Bingo Web Application designed for mobile and desktop browsers with real-time peer-to-peer WebRTC connectivity via PeerJS, zero-asset procedural Web Audio synthesis, Best-of Series match engine, Flying Tiles setup physics, exclusive Date Night Mode (Yugi & Renia) with the persistent Love Ledger wager vault, head-to-head stats tracking, and an intelligent AI practice bot.
 
 [![Live App](https://img.shields.io/badge/Live_Deployment-Vercel-black?style=for-the-badge&logo=vercel)](https://bingo-web-app-nine.vercel.app)
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![WebRTC](https://img.shields.io/badge/WebRTC-PeerJS-FF6B6B?style=for-the-badge&logo=webrtc&logoColor=white)](https://peerjs.com/)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-14.3-black?style=for-the-badge&logo=framer)](https://www.framer.com/motion/)
 
 ---
 
-## 🌐 Live Deployment
+## 🌐 Live Deployment & Instant Play
 
 * **Production URL:** [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app)
 * **Direct Invite Format:** `https://bingo-web-app-nine.vercel.app/?room=XXXX` (where `XXXX` is any 4-digit room code)
 
 ---
 
-## 🌟 Overview & Key Highlights
+## 🌟 Architecture & Key Highlights
 
-* **Zero-Backend Architecture**: Operates 100% client-side in the browser. Requires zero database instances, no Firebase, no custom backend relay servers, and zero API keys.
-* **Instant Serverless P2P Multiplayer**: Direct browser-to-browser WebRTC data channels via **PeerJS** using a deterministic 4-digit room code or shareable invite link (`?room=XXXX`).
-* **Best-of Series Match Engine**: Select from **Single Round**, **Best of 3**, **Best of 5**, **Best of 7**, or **Best of 10**. Real-time round win tracking, round transition modals, alternating starters, and grand series champion celebrations.
-* **Exclusive "Date Night" Mode (Yugi & Renia)**: A dedicated romantic theme transforming the app with deep velvet rose surfaces, champagne gold accents (`#FBBF24`), heart icons, playful love banter banners, sweet crystalline harp audio chimes, and flying heart-burst confetti!
-* **Persistent Head-to-Head Stats & Leaderboards (`localStorage`)**: Tracks lifetime series wins, individual round records, and win streaks for both players, viewable from the sleek lobby stats card.
-* **Dark Obsidian & Glassmorphism Aesthetics**: Mobile-first responsive design crafted for mobile and desktop browsers (iOS Safari, Android Chrome, etc.):
-  - Exact `100dvh` viewport adaptation and PWA home-screen support (`apple-mobile-web-app-capable`).
-  - Tactile 3D glass tiles with physical bottom lip, depressed called states, and radiant emerald or champagne-rose winning line glows.
-  - Ambient radial background glow orbs (`#6366F1` Indigo & `#10B981` Emerald in Classic; `#F43F5E` Velvet Rose & `#FBBF24` Champagne Gold in Date Night).
-* **Zero-Asset Web Audio Synthesizer**: Pure Web Audio API oscillators mathematically synthesizing mechanical pops, woody opponent thocks, harmonic line chimes, romantic harp chords, triumphant arpeggio fanfares, and percussive shuffle ticks without external MP3/WAV files.
-* **Smart AI Practice Bot**: Play solo anytime with a heuristic AI bot featuring a natural 650ms thinking delay and weighted line-progression scoring.
-* **12-Line Win Detector & Simultaneous Tie Handling**: Evaluates all 5 rows, 5 columns, and 2 diagonals simultaneously; handles mutual 5-line completions gracefully with dual confetti celebrations.
+* **Zero-Backend Architecture**: Runs 100% client-side in the browser. Requires zero database instances, no Firebase, no custom backend relay servers, and zero API keys.
+* **Zero-Server P2P Multiplayer**: Direct browser-to-browser WebRTC data channels via **PeerJS** with deterministic 4-digit room codes or one-click auto-join URLs (`?room=XXXX`).
+* **"Flying Tiles" Setup Physics**: Powered by **Framer Motion `<LayoutGroup>`**, manual sequential board setup animates physical tiles un-docking from the "Next on tap" preview and flying fluidly into grid slots with tactile spring physics.
+* **Best-of Series Match Engine**: Select from **Single Round**, **Best of 3**, **Best of 5**, **Best of 7**, or **Best of 10** with automatic clinch detection, scorekeeping, alternating first turns, and series championship celebrations.
+* **Exclusive "Date Night" Mode (Yugi & Renia)**: A luxurious couples experience featuring velvet rose surfaces, shimmering gold foil wager text, persistent **Love Ledger (Wager Vault)**, live floating emote reactions (`❤️, 😘, 👀, 🔥, 🥺`), floating champagne particles, and commemorative Polaroid victory cards.
+* **Procedural Web Audio Synthesizer**: Zero external MP3/WAV audio assets. Uses browser-native Web Audio API oscillators to generate a **Musical Tone Staircase** (ascending pentatonic notes C4–A7), line completion chimes, victory arpeggios, and percussive haptic clicks.
+* **Intelligent AI Practice Bot**: Solo training partner equipped with line-advancing heuristic lookahead and natural humanized thinking delays.
+* **Tactile Obsidian & Glassmorphism Design**: Mobile-first responsive layout tailored for iOS Safari, Android Chrome, and desktop browsers with true `100dvh` viewport adaptation and home-screen PWA support.
 
 ---
 
-## 🛠️ Complete Tech Stack & Architecture Details
+## 🎯 Detailed System Breakdown
 
-| Layer | Technology | Version | Purpose & Implementation Details |
+### 1. Core Match Engine & 12-Line Win Detector
+* **5×5 Square Matrix:** Responsive 1–25 number grid with strict 1:1 aspect ratio and zero coordinate drift.
+* **12-Line Win Evaluator:** Continuously computes completed rows (5), columns (5), and diagonals (2). Scoring 5 lines spells **B-I-N-G-O** and clinches the round.
+* **Best-of Series Engine:**
+  - **Single Match:** 1 win needed
+  - **Best of 3:** First to 2 wins
+  - **Best of 5:** First to 3 wins
+  - **Best of 7:** First to 4 wins
+  - **Best of 10:** First to 6 wins
+* **Turn Management:** Deterministic turn-swapping between host and guest (or player and bot), with automatic turn alternation at the start of each new round.
+* **Smart AI Practice Bot:** Evaluates potential calls against its private board, prioritizing lines with 4/5 or 3/5 completion to simulate competitive human play. The bot automatically pauses while the human finishes board setup in multi-round matches.
+
+---
+
+### 2. Pre-Game Setup Phase & "Flying Tiles" Physics
+* **On-Tap Sequential Placement (Default):**
+  - Tap any open slot on the board to place the next number in sequence (`1, 2, 3... 25`).
+  - Empty slots start clean and uncluttered without distracting ghost numbers.
+* **"Flying Tiles" Spring Animation (Framer Motion `<LayoutGroup>`):**
+  - The "Next on tap: #X" badge and the 25 board slots share animated layout contexts via `layoutId="tile-{number}"`.
+  - Tapping an empty slot causes the tile to visually un-dock and fly seamlessly into place with high-stiffness spring damping (`stiffness: 400, damping: 30`).
+  - Tapping a placed number instantly un-docks it and flies it back out.
+* **Undo & Quick Helpers:**
+  - **Undo Button:** Step back and remove the most recently placed number.
+  - **Random Shuffle 🎲:** One-tap Fisher-Yates generator to instantly fill empty slots or shuffle a fresh board.
+  - **Clear Board ↺:** Instant reset to start fresh at any point during setup.
+  - Fully functional in Round 1, Round 2, and all subsequent series rounds.
+
+---
+
+### 3. Zero-Server P2P Multiplayer (PeerJS WebRTC)
+* **Deterministic Addressing:** Room codes automatically construct WebRTC peer IDs using the prefix `bingo25-live-room-{code}`.
+* **Instant URL Auto-Join:** Joining via link (`?room=1234`) pre-fills the room code and opens the connection seamlessly.
+* **Stale-Closure Protected State Sync:** All incoming peer packets (`NEXT_ROUND`, `LINE_COMPLETED`, `EMOTE_REACTION`, `NUMBER_CALLED`, `SYNC_STATE`) resolve through React `useRef` bridges to eliminate stale closures.
+* **Multiplayer Turn & Alert Synchronization:** Calls and line claims reflect instantly on both screens with zero perceived latency.
+
+---
+
+### 4. Exclusive "Date Night" Mode (Yugi & Renia)
+* **Custom Velvet Rose & Gold Palette:** Deep velvet rose backdrops (`#12030C`), ambient gold orbs (`#FBBF24`), and glowing heart indicators.
+* **Floating Champagne Particles:** 20 lightweight, zero-dependency `<motion.div>` ambient particles that drift upward through the background with staggered timing and soft golden shadows.
+* **Freeform Stakes & Custom Wagers:** Set custom romantic bets (or choose presets: *"15-Min Massage 💆"*, *"Chooses Dinner 🍕"*, *"Breakfast in Bed 🥞"*, *"Does Dishes Tonight 🧼"*).
+* **The Love Ledger (Wager Vault):**
+  - Persistent historical record stored in `localStorage` tracking every Date Night series played.
+  - Displays match date, winner, final series score, and unsettled penalties.
+  - One-tap toggle to mark debts as **Pending** or **Fulfilled** (with strike-through styling).
+  - Quick-access button directly accessible from the Lobby and Series Victory screen.
+* **Shimmering Gold Foil Wager Text:** Dynamic wager strings rendered in the Polaroid card and Love Ledger gleam with animated metallic gold gradients (`.shimmer-text`).
+* **Real-Time Floating Love Emotes:** Interactive emoji bar (`❤️, 😘, 👀, 🔥, 🥺`) during multiplayer matches that dispatches floating reactions across both players' screens.
+* **Polaroid Victory Memory Card:** Post-series commemorative Polaroid frame featuring match date, victor, agreed-upon prize, and a one-click **"Copy Love Note"** button.
+
+---
+
+### 5. Procedural Web Audio Engine (Zero Assets)
+* **Musical Tone Staircase (`playPlacementNote`):**
+  - Sequentially placing numbers 1 through 25 plays ascending pentatonic scale notes from **C4 (261.63 Hz)** up to **A7 (3520.00 Hz)** and harmonic peaks beyond.
+  - Simulates a cheerful music box or wooden kalimba while filling your board.
+* **Harmonic Line Completion Chime (`playLineCompleteSound`):** Two-note rising chord (D5 to A5) that rings whenever a line is claimed.
+* **Romantic Crystalline Chime (`playRomanticChime`):** Multi-octave harp shimmer exclusive to Date Night mode.
+* **Triumphant Victory Fanfare (`playWinFanfare`):** 4-note ascending arpeggio (C5 → E5 → G5 → C6) played on round and series wins.
+* **Mechanical Clicks & Taps:** Tactile sine clicks on user calls and woody thocks on opponent moves.
+* **Global Audio Mute:** Session-persistent mute toggle with state preservation.
+
+---
+
+### 6. Visual Polish & Tactile Motion Design
+* **Tactile Tile Spring Squash:** Board buttons squash smoothly on press using physical spring dynamics (`scale: 0.88`, `stiffness: 500`, `damping: 18`).
+* **3D Arcade Call Puck:** The active number call badge bounces into view with dynamic 3D drop-shadows and spring scale pop.
+* **B-I-N-G-O Header Lights:** Five prominent letter badges illuminate and pulse with celebratory gold/rose glow as lines 1 through 5 are claimed.
+* **Radiant Winning Line Glow:** Tiles in completed lines illuminate with golden pulsing borders (`.bingo-tile.winning`) while keeping numbers completely legible.
+* **Non-Blocking Top Line Alert:** Slide-down notification banner announcing line completion (e.g. `❤️ You claimed Column 4! (3/5)`) without obstructing board numbers.
+* **Full-Screen Confetti Cannon:** Multi-stage celebration fireworks and custom heart-shaped confetti bursts (`canvas-confetti`).
+
+---
+
+### 7. Stats, Resilience & Platform Architecture
+* **Head-to-Head Lifetime Statistics:** Persistent tracking of total series played, series win rates, round win rates, and current winning streaks between Yugi and Renia.
+* **Crash-Resistant Global Error Boundary:** Catches unforeseen client runtime errors and renders a styled recovery screen with a single-click reset CTA.
+* **Progressive Web App (PWA) Ready:** Configured with mobile viewports, theme colors, touch-action optimizations, and home-screen bookmark support.
+
+---
+
+## 💻 Tech Stack & Dependencies
+
+| Layer | Library / Tool | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Frontend Framework** | **React** | `^19.2.8` | Declarative component state machine managing Lobby, Waiting Room, Arena, Round Over, and Series Champion flows (`useState`, `useEffect`, `useRef`, `useCallback`). |
-| **DOM Renderer** | **React DOM** | `^19.2.8` | Client-side root rendering in React 19 `StrictMode`. |
-| **Build Tool & Bundler** | **Vite** | `^8.3.0` | High-performance bundling and sub-second HMR via `@vitejs/plugin-react`. |
-| **Styling & CSS** | **Tailwind CSS v4** | `^4.0.0` | Utility CSS engine configured via `@tailwindcss/vite` combined with Obsidian and Date Night velvet rose styling. |
-| **P2P Multiplayer** | **PeerJS (WebRTC)**| `^1.5.5` | Decentralized WebRTC peer connections using deterministic room addressing (`bingo25-live-room-XXXX`). |
-| **Animations & UI** | **Framer Motion** | `^14.3.0` | Fluid spring physics, modal transitions, and dynamic pulse animations for B-I-N-G-O letter badges. |
-| **Icons** | **Lucide React** | `^1.59.0` | Accessible iconography (`Trophy`, `Shuffle`, `Share2`, `Copy`, `Volume2`, `Bot`, `Users`, `RefreshCw`, `Heart`, `Flame`, `Swords`, etc.). |
-| **Celebrations** | **Canvas Confetti**| `^1.9.4` | Particle physics confetti burst effects featuring custom SVG heart shapes (`shapeFromPath`) for Date Night and classic emerald-gold fireworks. |
-| **Audio Synthesis** | **Web Audio API** | Native | Zero-latency synthesis using `AudioContext`, gain nodes, and frequency ramps; lazy-initialized to satisfy iOS autoplay policies. |
-| **Linter / QA** | **Oxlint** | `^1.81.0` | Fast static code analysis and quality verification. |
+| **Framework** | React 19 | `^19.2.8` | Component lifecycle, state machines, and hooks |
+| **Styling** | Tailwind CSS v4 | `^4.3.3` | Modern utility CSS engine via `@tailwindcss/vite` |
+| **Motion** | Framer Motion | `^14.3.0` | LayoutGroup Flying Tiles, spring physics, and particle drift |
+| **Networking**| PeerJS (WebRTC) | `^1.5.5` | P2P direct browser data channels |
+| **Particles** | Canvas Confetti | `^1.9.4` | Particle physics confetti and custom SVG heart bursts |
+| **Icons** | Lucide React | `^1.59.0` | High-clarity SVG UI iconography |
+| **Build** | Vite | `^8.3.0` | Sub-second HMR and optimized asset bundling |
+| **Linter** | Oxlint | `^1.81.0` | High-speed static analysis and linting |
 
 ---
 
-## 🎯 Core Features & Game Mechanics
+## 🚀 Local Development & Setup
 
-### 1. Best-of Series Match Engine
-* **Flexible Series Formats**:
-  - **Single Round**: 1 win needed
-  - **Best of 3**: First to 2 wins takes the series
-  - **Best of 5**: First to 3 wins takes the series
-  - **Best of 7**: First to 4 wins takes the series
-  - **Best of 10**: First to 6 wins takes the series
-* **Round Progression & Transitions**:
-  - Completing 5 lines completes the round and awards 1 point.
-  - A **Round Winner Modal** displays the round score and series standing.
-  - Tapping **"Start Next Round"** automatically generates fresh boards, clears called numbers, alternates who makes the opening move, and preserves the active WebRTC connection without re-dialing.
-* **Grand Series Champion**:
-  - When either player reaches the majority series quota (`targetWins`), the **Series Champion Modal** is triggered with confetti, fanfares, and persistent stats updates.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Yugikratos/bingo-web-app.git
+   cd bingo-web-app
+   ```
 
-### 2. Exclusive "Date Night" Mode (Yugi & Renia)
-* **One-Tap Romantic Mode Toggle**:
-  - Prominent toggle in the lobby with a glowing heart (`❤️`).
-  - Allows instant persona selection: **"Yugi 🥂"** or **"Renia 🌹"**.
-  - In Solo Practice mode, dynamically inverts the opponent: playing as Yugi pairs you with **Renia (AI 💕)**; playing as Renia pairs you with **Yugi (AI 🥂)**.
-* **Romantic Theme Overhaul**:
-  - Surfaces shift from Obsidian black to deep velvet rose (`#12030C`).
-  - Ambient glowing orbs shift to Rose (`#F43F5E`) and Champagne Gold (`#FBBF24`).
-  - Called tiles feature deep rose gradients with `#FB7185` neon borders; winning line tiles glow in radiant champagne gold.
-  - Heart badges (`❤️` & `💕`) prominently displayed next to player names and scores.
-* **Date Night Wager & Stakes Engine**:
-  - Select high-stakes romantic wagers directly in the lobby:
-    - *15-Min Massage 💆*
-    - *Chooses Tomorrow’s Dinner 🍕*
-    - *Breakfast in Bed 🥞*
-    - *Buys Morning Coffee ☕*
-    - *Does the Dishes Tonight 🧼*
-    - *Forehead Kisses on Demand 😘*
-    - *Custom Wager Input* (create your own stakes on the fly!)
-  - The agreed-upon wager is synced over WebRTC and displayed throughout the match and etched into the victory celebration.
-* **Real-Time Floating Love Emote Reactions**:
-  - In-game quick reaction bar with 5 expressive floating emotes: `❤️`, `😘`, `👀`, `🔥`, `🥺`.
-  - Tapping an emote spawns a floating reaction with natural randomized drift and immediately dispatches an `EMOTE_REACTION` packet over WebRTC so it floats up on your partner's screen in real time!
-* **Synchronized 4.8s Line Completion Notification**:
-  - When either player completes a line, a prominent floating banner (`"Yugi claimed a line! ❤️"` or `"Renia claimed a line! 💕"`) stays visible for 4.8 seconds on both devices accompanied by a synchronized romantic harp chime, ensuring neither partner misses when the other is progressing.
-* **Digital Polaroid Victory Memory Card**:
-  - At the end of a Date Night series, players can open a nostalgic, retro **Digital Polaroid Memory Card** commemorating the match.
-  - Displays the victor, winning score, date & time stamp, agreed-upon wager won, and a one-click **"Copy Love Note"** button formatted for iMessage / WhatsApp sharing.
-* **Tactile Haptic Feedback**:
-  - Integrated via `navigator.vibrate` with graceful safety checks for mobile devices.
-  - Provides subtle tactile feedback on tile taps (15ms), harmonic double-pulses on line claims (`[25, 40, 25]`), and celebratory fanfare vibration patterns on victory (`[50, 60, 50, 60, 100]`).
-* **Playful / Romantic Gender-Tailored Flavor Banners**:
-  - When playing as Yugi: *"Waiting for Renia's sweet move... 💕"*, *"Make your lady proud, handsome! ✨"*, *"Renia claimed a line! ❤️"*.
-  - When playing as Renia: *"Waiting for Yugi's genius move... ✨"*, *"Show him how it's done, gorgeous! 💖"*, *"Yugi claimed a line! 🥂"*.
-* **Custom Flying Heart Confetti**:
-  - Emits real flying heart particles using SVG heart path geometry with rose, fuchsia, and champagne gold palettes.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-### 3. Persistent Head-to-Head Stats & Leaderboards (`localStorage`)
-* Stored locally under key `bingo_h2h_stats_v2`:
-  - **Lifetime Yugi vs. Renia Rivalry**: Dedicated series counters for both Yugi and Renia.
-  - **Total Individual Rounds Won**: Cumulative rounds tally across all play sessions.
-  - **Active Win Streak & Streak Holder**: Tracks current momentum (`🔥 3 in a row (Yugi)`).
-* Includes a sleek rivalry card displayed right in the lobby with an instant "Reset" confirmation.
+3. **Start the local development server:**
+   ```bash
+   npm run dev
+   ```
 
-### 4. Real-Time 12-Line Win Detector (`evaluateBoard`)
-* Continuously evaluates all 12 potential winning lines:
-  - **5 Horizontal Rows**: `[0..4]`, `[5..9]`, `[10..14]`, `[15..19]`, `[20..24]`
-  - **5 Vertical Columns**: `[0,5,10,15,20]`, `[1,6,11,16,21]`, `[2,7,12,17,22]`, `[3,8,13,18,23]`, `[4,9,14,19,24]`
-  - **2 Diagonals**: `[0,6,12,18,24]` (Main), `[4,8,12,16,20]` (Anti)
-* Uses a `Set` for $O(1)$ constant-time tile checks.
-* When `completedLinesCount >= 5`, the round concludes immediately with a **B-I-N-G-O** victory.
+4. **Run static analysis & linting:**
+   ```bash
+   npm run lint
+   ```
 
-### 5. Simultaneous Tie Resolution
-* If a called number grants both players their 5th line simultaneously:
-  - Game recognizes a mutual win condition.
-  - Dispatches `CLAIM_TIE` packet across the WebRTC data channel.
-  - Both players receive the "SIMULTANEOUS TIE!" celebratory modal, fanfare audio, and dual confetti bursts.
-
-### 6. Smart AI Practice Bot Heuristic (`getBestBotMove`)
-* Evaluates all remaining uncalled numbers on the bot's board:
-  - **Completes a Line**: `+1500` points
-  - **Creates 4-in-a-row**: `+200` points
-  - **Creates 3-in-a-row**: `+40` points
-  - **Creates 2-in-a-row**: `+10` points
-* Randomizes selection among ties to provide natural, non-repetitive gameplay.
+5. **Build for production:**
+   ```bash
+   npm run build
+   ```
 
 ---
 
-## 🔊 Zero-Asset Synthesized Audio Engine (`src/utils/sound.js`)
+## 📜 License & Credits
 
-All sound effects are synthesized via native mathematical oscillators, eliminating network asset requests and playback lag:
-
-1. **`playTapSound()`** (Mechanical Tile Pop):
-   - Waveform: `triangle`
-   - Frequency: `520 Hz` ramping down exponentially to `180 Hz` over `0.08s` (gain `0.3` to `0.001`).
-2. **`playOpponentTapSound()`** (Opponent Move Woody Thock):
-   - Waveform: `sine`
-   - Frequency: `340 Hz` ramping to `220 Hz` over `0.08s` (gain `0.32` to `0.001`).
-3. **`playLineCompleteSound()`** (Line Completion Chime):
-   - Waveform: `sine`
-   - Harmonic two-note chime: Note 1 at `587.33 Hz` ($D_5$), Note 2 at `880.00 Hz` ($A_5$) staggered by `0.12s`.
-4. **`playRomanticChime()`** (Date Night Music-Box Harp Arpeggio):
-   - Waveform: `sine`
-   - Notes: $F\sharp_5$ (`739.99 Hz`), $A\sharp_5$ (`932.33 Hz`), $C\sharp_6$ (`1108.73 Hz`), $F_6$ (`1396.91 Hz`) with warm bell decays.
-5. **`playWinFanfare()`** (Triumphant 4-Note Arpeggio):
-   - Overlapping arpeggio chord: $C_5$ (`523.25 Hz`) $\rightarrow$ $E_5$ (`659.25 Hz`) $\rightarrow$ $G_5$ (`783.99 Hz`) $\rightarrow$ $C_6$ (`1046.50 Hz`).
-6. **`playShuffleSound()`** (Percussive Shuffle Tick):
-   - Triple micro-click burst at `0s`, `0.04s`, and `0.08s` ramping `680 Hz` down to `260 Hz` in `30ms`.
-
----
-
-## 📡 WebRTC Data Channel Protocol (`src/App.jsx`)
-
-Rooms communicate peer-to-peer using deterministic room mapping: `const PEER_PREFIX = 'bingo25-live-room-';`.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Host as Host (Yugi)
-    participant HostPeer as Host Peer (Prefix + Code)
-    participant GuestPeer as Guest Peer
-    actor Guest as Guest (Renia)
-
-    Host->>HostPeer: Create Room (Selects Best of 5, Wager, Date Night)
-    Guest->>GuestPeer: Enters Code / Follows URL (?room=XXXX)
-    GuestPeer->>HostPeer: Connect via WebRTC Data Channel
-    GuestPeer->>HostPeer: HELLO { name: 'Renia', isDateNight: true }
-    HostPeer->>GuestPeer: HELLO_ACK { name: 'Yugi', turn: 'host', seriesLength: 5, isDateNight: true, wager: '15-Min Massage 💆' }
-    Note over Host,Guest: Match Begins (Arena Screen Loaded)
-
-    loop Mid-Match Interactions & Reactions
-        Guest->>GuestPeer: Taps Floating Heart Emote (❤️)
-        GuestPeer->>HostPeer: EMOTE_REACTION { emoji: '❤️', senderName: 'Renia' }
-        Note over Host: Floating heart floats up in real-time
-    end
-
-    loop Gameplay Round 1
-        Host->>HostPeer: Calls Number (e.g. 17)
-        HostPeer->>GuestPeer: CALL_NUMBER { number: 17, nextTurn: 'guest', linesCount: 1 }
-        HostPeer->>GuestPeer: LINE_COMPLETED { linesCount: 1, senderName: 'Yugi' }
-        Note over Host,Guest: Both devices show 4.8s Banner & play Harp Chime
-        Guest->>GuestPeer: Calls Number (e.g. 8)
-        GuestPeer->>HostPeer: CALL_NUMBER { number: 8, nextTurn: 'host', linesCount: 1 }
-    end
-
-    alt Player Completes 5 Lines
-        HostPeer->>GuestPeer: CLAIM_WIN { winnerName: 'Yugi' }
-        Note over Host,Guest: Round 1 Over: Yugi leads 1 - 0
-        Host->>HostPeer: Taps "Start Round 2"
-        HostPeer->>GuestPeer: NEXT_ROUND { nextTurn: 'guest', roundNum: 2 }
-        Note over Host,Guest: Fresh Boards Loaded, Renia Starts Round 2
-    end
-
-    alt Player Reaches Series Quota (3 Wins)
-        Note over Host,Guest: Series Complete! Polaroid Victory Card Unlocked & Confetti
-        HostPeer->>GuestPeer: SERIES_REMATCH_REQUEST {}
-        GuestPeer->>HostPeer: SERIES_REMATCH_ACCEPT { nextStartingTurn }
-        Note over Host,Guest: Scores Reset 0-0, New Series Begins
-    end
-```
-
-### WebRTC Packet Reference
-| Packet Type | Direction | Payload Attributes | Description |
-| :--- | :--- | :--- | :--- |
-| `HELLO` | Guest $\rightarrow$ Host | `{ name, isDateNight }` | Initiates handshake and transmits guest nickname and theme state. |
-| `HELLO_ACK` | Host $\rightarrow$ Guest | `{ name, turn, seriesLength, isDateNight, wager }` | Confirms connection, transmits host rules, turn order, and active wager. |
-| `CALL_NUMBER` | Peer $\leftrightarrow$ Peer | `{ number, nextTurn, linesCount }` | Broadcasts called number (1–25) and passes active turn. |
-| `LINE_COMPLETED`| Peer $\leftrightarrow$ Peer | `{ linesCount, senderName }` | Triggers synchronized 4.8s prominent banner and romantic chime. |
-| `EMOTE_REACTION`| Peer $\leftrightarrow$ Peer | `{ emoji, senderName }` | Triggers floating physics reaction on partner's screen. |
-| `CLAIM_WIN` | Peer $\leftrightarrow$ Peer | `{ winnerName }` | Broadcasts 5-line round victory and triggers celebration modal. |
-| `CLAIM_TIE` | Peer $\leftrightarrow$ Peer | `{}` | Broadcasts simultaneous mutual 5-line tie. |
-| `NEXT_ROUND` | Host $\rightarrow$ Guest | `{ nextTurn, roundNum }` | Synchronizes board resets and advances series round counter. |
-| `SERIES_REMATCH_REQUEST` | Peer $\leftrightarrow$ Peer | `{}` | Requests reset for a fresh Best-of series. |
-| `SERIES_REMATCH_ACCEPT` | Peer $\leftrightarrow$ Peer | `{ nextStartingTurn }` | Accepts series rematch and resets scores to 0–0. |
-
----
-
-## 📱 Mobile-First iOS Safari Ergonomics
-
-* **Native PWA Ready**: Includes meta tags for full-screen display (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style: black-translucent`).
-* **Viewport Lock**: Prevents pull-to-refresh, accidental bounce/elastic scrolling, and page zooming using `touch-action: manipulation;` and fixed positioning.
-* **No Text Selection or Callouts**: Configured with `-webkit-touch-callout: none;` and `-webkit-user-select: none;`.
-* **Zero Tap Gray Boxes**: Stripped default mobile highlight styling via `-webkit-tap-highlight-color: transparent;`.
-* **Tabular Figures**: Utilizes `font-variant-numeric: tabular-nums` to eliminate number alignment jitter during gameplay.
-* **Safe-Area Insets**: Proper padding supporting iPhone Dynamic Island, top notch, and home indicator bar.
-
----
-
-## 📖 Step-by-Step Usage Guide
-
-### A. How to Host a Multiplayer Game
-1. Visit [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app).
-2. Enter your nickname (or select **"I am Yugi 🥂"** / **"I am Renia 🌹"**).
-3. Toggle **"Date Night Mode (Yugi & Renia)"** if playing with your partner.
-4. Select your **Series Length** (Single, Best of 3, 5, 7, or 10).
-5. Tap **"Create 2-Player Room"**.
-6. Share the 4-digit room code or tap **"Share Invite Link"** to send via iMessage/WhatsApp.
-
-### B. How to Join a Multiplayer Game
-* **Via Invite Link**: Open the shared link (e.g., `https://bingo-web-app-nine.vercel.app/?room=1234`). The room code is automatically detected and populated. Tap **"Join"** to connect instantly.
-* **Via 4-Digit Code**: On the lobby screen, type the 4-digit code provided by the host and tap **"Join"**.
-
-### C. How to Install as an iOS Home-Screen App (PWA)
-1. Open [https://bingo-web-app-nine.vercel.app](https://bingo-web-app-nine.vercel.app) in **Safari** on your iPhone.
-2. Tap the **Share** button (box with an upward arrow) in the bottom toolbar.
-3. Scroll down and tap **"Add to Home Screen"**.
-4. Confirm by tapping **"Add"** in the top right.
-5. Launch **BINGO // 25** directly from your Home Screen for a clean, full-screen standalone app experience without browser address bars!
-
----
-
-## 💻 Local Development & Deployment
-
-### Prerequisites
-* **Node.js**: `v18.0.0` or higher
-* **npm**: `v9.0.0` or higher
-
-### Local Setup
-```bash
-# Clone or navigate to the project directory
-git clone https://github.com/your-username/bingo-web-app.git
-cd bingo-web-app
-
-# Install dependencies
-npm install
-
-# Start development server with LAN host exposure
-npm run dev -- --host
-```
-
-### Production Build & Preview
-```bash
-# Compile and optimize for production
-npm run build
-
-# Preview production build locally
-npm run preview
-```
-
-### Deploying to Vercel
-This project deploys seamlessly as a static Vite application on Vercel:
-```bash
-npm install -g vercel
-vercel
-```
-Or connect the repository directly in the [Vercel Dashboard](https://vercel.com) with standard Vite presets (`dist` build output, `npm run build` command).
-
----
-
-## 📄 License
-This project is open-source under the [MIT License](LICENSE).
+* Crafted with ❤️ by **Yugi & Renia**.
+* Released under the **MIT License**.
