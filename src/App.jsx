@@ -2108,6 +2108,9 @@ export default function App() {
         {isDateNight && <FloatingParticles />}
       </div>
 
+      {/* Film Grain Texture Overlay */}
+      <div className="noise-overlay" aria-hidden="true" />
+
       {/* Floating Reaction Emotes */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         {floatingEmotes.map((item) => (
@@ -2130,10 +2133,10 @@ export default function App() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -15, scale: 0.95 }}
-            className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 border text-xs sm:text-sm font-semibold tracking-wide ${
+            className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-wide ${
               isDateNight
-                ? 'border-rose-400/30 text-rose-100 bg-rose-950/90 shadow-rose-950/60'
-                : 'border-white/20 text-white'
+                ? 'text-rose-100 bg-rose-950/90 shadow-rose-950/60'
+                : 'text-white'
             }`}
           >
             {isDateNight ? (
@@ -2228,7 +2231,7 @@ export default function App() {
               className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
                 isDateNight
                   ? 'bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-amber-950/30 border-rose-500/40 shadow-rose-950/50'
-                  : 'glass-card border-white/10 hover:border-white/20'
+                  : 'glass-card'
               }`}
             >
               <div className="flex items-center gap-3 text-left">
@@ -2331,7 +2334,7 @@ export default function App() {
                   <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
                     <span>Yugi</span> 🥂
                   </div>
-                  <div className="text-2xl font-black text-amber-400 font-mono leading-none my-1">
+                  <div className="text-2xl font-black text-amber-400 font-display leading-none my-1">
                     {stats.yugiSeriesWon || 0}{' '}
                     <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
                   </div>
@@ -2351,7 +2354,7 @@ export default function App() {
                   <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
                     <span>Renia</span> 🌹
                   </div>
-                  <div className="text-2xl font-black text-rose-300 font-mono leading-none my-1">
+                  <div className="text-2xl font-black text-rose-300 font-display leading-none my-1">
                     {stats.reniaSeriesWon || 0}{' '}
                     <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
                   </div>
@@ -2368,7 +2371,7 @@ export default function App() {
             <GlareCard
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mb-2 p-3.5 rounded-2xl glass-card border border-rose-500/40 space-y-2 shadow-lg"
+              className="mb-2 p-3.5 rounded-2xl glass-card space-y-2 shadow-lg"
             >
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
@@ -2645,17 +2648,17 @@ export default function App() {
 
             {/* Giant Room Code Display */}
             <div
-              className={`glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden border shadow-2xl ${
+              className={`glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden shadow-2xl ${
                 isDateNight
-                  ? 'border-rose-500/40 shadow-rose-950/50'
-                  : 'border-indigo-500/40 shadow-indigo-950/50'
+                  ? 'shadow-rose-950/50'
+                  : 'shadow-indigo-950/50'
               }`}
             >
               <div className="text-xs uppercase font-bold text-slate-400 tracking-widest mb-1.5">
                 Room Code
               </div>
               <div
-                className={`text-5xl sm:text-6xl font-black tracking-widest font-mono ${
+                className={`text-5xl sm:text-6xl font-black tracking-widest font-display ${
                   isDateNight ? 'text-rose-300' : 'text-indigo-300'
                 }`}
               >
@@ -2762,7 +2765,7 @@ export default function App() {
             </button>
 
             {/* Series Indicator & Target */}
-            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full glass-panel text-xs font-bold border border-white/10">
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full glass-panel text-xs font-bold">
               <Swords size={14} className="text-amber-400" />
               <span>
                 Round {currentRound} • Best of {seriesLength} (First to {targetWins})
@@ -2802,7 +2805,7 @@ export default function App() {
                 </span>
               </div>
               <span
-                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
                   isDateNight ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'
                 }`}
               >
@@ -2817,7 +2820,7 @@ export default function App() {
             {/* Player 2 (Opponent) */}
             <div className="flex items-center gap-2 min-w-0 justify-end">
               <span
-                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
                   isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
                 }`}
               >
@@ -2990,7 +2993,7 @@ export default function App() {
                         }
                         disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
                         onClick={() => handleTileClick(index)}
-                        className={`bingo-tile ${
+                        className={`bingo-tile font-display ${
                           isEmpty
                             ? 'empty'
                             : isWinning
@@ -3003,7 +3006,7 @@ export default function App() {
                       >
                         {/* Last Called Pulse Ring */}
                         {isLast && <div className="last-called-ring" />}
-                        <span>{isEmpty ? '' : number}</span>
+                        <span className="font-display">{isEmpty ? '' : number}</span>
                       </motion.button>
                     );
                   })}
@@ -3029,7 +3032,7 @@ export default function App() {
           {isDateNight && isBoardLocked && role !== 'solo' && (
             <div className="flex items-center justify-center gap-2 py-0.5">
               <span className="text-xs font-bold text-rose-300 opacity-80">Send Love:</span>
-              <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel border border-rose-500/30 shadow-md">
+              <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel shadow-md">
                 {EMOTE_LIST.map((emoji) => (
                   <button
                     key={emoji}
@@ -3046,7 +3049,7 @@ export default function App() {
 
           {/* Setup Control Panel / In-game Call Status */}
           {!isBoardLocked ? (
-            <div className="w-full max-w-sm mx-auto p-3.5 rounded-2xl glass-card border border-slate-700/60 shadow-xl space-y-2.5 my-1">
+            <div className="w-full max-w-sm mx-auto p-3.5 rounded-2xl glass-card shadow-xl space-y-2.5 my-1">
               {/* Header Status Row */}
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
@@ -3184,9 +3187,7 @@ export default function App() {
               initial={{ scale: 0.88, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.88, y: 15 }}
-              className={`glass-card w-full max-w-sm p-5 text-center space-y-4 border shadow-2xl ${
-                isDateNight ? 'border-rose-500/40' : 'border-white/20'
-              }`}
+              className="glass-card w-full max-w-sm p-5 text-center space-y-4 shadow-2xl"
             >
               <div
                 className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white shadow-xl ${
@@ -3217,7 +3218,7 @@ export default function App() {
               <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-700/60 flex items-center justify-around">
                 <div className="text-center">
                   <span className="text-xs font-bold text-slate-400 block">{playerName}</span>
-                  <span className="text-xl font-black text-white">
+                  <span className="text-xl font-black text-white font-display">
                     {roundWinnerInfo.localScore}
                   </span>
                 </div>
@@ -3226,7 +3227,7 @@ export default function App() {
                 </div>
                 <div className="text-center">
                   <span className="text-xs font-bold text-slate-400 block">{opponentName}</span>
-                  <span className="text-xl font-black text-white">
+                  <span className="text-xl font-black text-white font-display">
                     {roundWinnerInfo.opponentScore}
                   </span>
                 </div>
@@ -3271,8 +3272,8 @@ export default function App() {
               initial={{ scale: 0.85, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.85, y: 20 }}
-              className={`glass-card w-full max-w-sm p-6 text-center space-y-4 border shadow-2xl ${
-                isDateNight ? 'border-rose-500/50 shadow-rose-950/60' : 'border-amber-400/30 shadow-amber-950/50'
+              className={`glass-card w-full max-w-sm p-6 text-center space-y-4 shadow-2xl ${
+                isDateNight ? 'shadow-rose-950/60' : 'shadow-amber-950/50'
               }`}
             >
               {/* Grand Trophy Icon */}
@@ -3400,9 +3401,7 @@ export default function App() {
               initial={{ scale: 0.9, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 15 }}
-              className={`glass-card w-full max-w-sm p-4 sm:p-5 space-y-3.5 border shadow-2xl max-h-[88vh] flex flex-col ${
-                isDateNight ? 'border-rose-500/40' : 'border-white/20'
-              }`}
+              className="glass-card w-full max-w-sm p-4 sm:p-5 space-y-3.5 shadow-2xl max-h-[88vh] flex flex-col"
             >
               <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
@@ -3472,7 +3471,7 @@ export default function App() {
                       <span className="font-bold text-white text-sm">
                         {isDateNight ? 'Yugi 🥂' : playerName}
                       </span>
-                      <span className="text-lg font-black text-amber-400 font-mono">
+                      <span className="text-lg font-black text-amber-400 font-display">
                         {isDateNight
                           ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
                           : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
@@ -3489,7 +3488,7 @@ export default function App() {
                       <span className="text-xs uppercase font-bold text-slate-400 block">
                         {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
                       </span>
-                      <span className="text-lg font-extrabold text-white">
+                      <span className="text-lg font-extrabold text-white font-display">
                         {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
                       </span>
                     </div>
@@ -3497,7 +3496,7 @@ export default function App() {
                       <span className="text-xs uppercase font-bold text-slate-400 block">
                         {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
                       </span>
-                      <span className="text-lg font-extrabold text-slate-300">
+                      <span className="text-lg font-extrabold text-slate-300 font-display">
                         {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
                       </span>
                     </div>
@@ -3667,7 +3666,7 @@ export default function App() {
                     text={`${seriesWinnerInfo.name} Won! 👑`}
                     className="text-base font-black text-white tracking-tight"
                   />
-                  <div className="text-[11px] text-amber-300 font-bold font-mono">
+                  <div className="text-[11px] text-amber-300 font-bold font-display">
                     Series Score: {seriesWinnerInfo.finalScore}
                   </div>
                 </div>

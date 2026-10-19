@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 *, *::before, *::after {
@@ -17,6 +18,7 @@
   --rose-dark: #BE123C;
   --slate-tile: rgba(30, 41, 59, 0.85);
   --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", -apple-system, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
 }
 
 html, body {
@@ -94,24 +96,55 @@ html, body {
   100% { transform: scale(1.2) translate(-4%, -4%); opacity: 0.95; }
 }
 
-/* Glassmorphism Styles */
+/* Film Grain Texture Overlay */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyMDAgMjAwJyB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJz48ZmlsdGVyIGlkPSdub2lzZSc+PGZlVHVyYnVsZW5jZSB0eXBlPSdmcmFjdGFsTm9pc2UnIGJhc2VGcmVxdWVuY3k9JzAuOCcgbnVtT2N0YXZlcz0nMycgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNub2lzZSknLz48L3N2Zz4=");
+  background-repeat: repeat;
+  background-size: 160px 160px;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Premium Display Typography (Space Grotesk) */
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: 'tnum' on, 'zero' on;
+}
+
+/* Glassmorphism Styles (1px 135deg Gradient Border & Top-Edge Lighting) */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.72);
+  background-color: rgba(15, 23, 42, 0.72);
+  background-image: 
+    linear-gradient(rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.72)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-  transition: background 0.4s ease, border-color 0.4s ease;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.15), 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .glass-card {
-  background: rgba(18, 24, 38, 0.78);
+  background-color: rgba(18, 24, 38, 0.78);
+  background-image: 
+    linear-gradient(rgba(18, 24, 38, 0.78), rgba(18, 24, 38, 0.78)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent;
+  border-radius: 24px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: background 0.4s ease, border-color 0.4s ease;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.15), 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .glass-button {
@@ -154,7 +187,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-family: var(--font-display);
+  font-feature-settings: 'tnum' on, 'zero' on;
+  font-weight: 800;
   font-size: 1.5rem;
   border-radius: 16px;
   cursor: pointer;
@@ -308,9 +343,14 @@ html, body {
 }
 
 .date-night-mode .glass-card {
-  background: rgba(34, 9, 23, 0.82) !important;
-  border-color: rgba(244, 63, 94, 0.22) !important;
-  box-shadow: 0 20px 45px -10px rgba(20, 2, 12, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(34, 9, 23, 0.82) !important;
+  background-image: 
+    linear-gradient(rgba(34, 9, 23, 0.82), rgba(34, 9, 23, 0.82)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(251, 113, 133, 0.15) 35%, transparent 100%) !important;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent !important;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.18), 0 20px 45px -10px rgba(20, 2, 12, 0.85) !important;
 }
 
 .date-night-mode .glass-button {
