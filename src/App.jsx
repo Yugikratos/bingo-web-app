@@ -28,7 +28,8 @@ import {
   Smile,
   Send,
   Download,
-  Lock
+  Lock,
+  ScrollText
 } from 'lucide-react';
 import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES } from './utils/bingoEngine';
 import {
@@ -99,11 +100,22 @@ export default function App() {
     return localStorage.getItem('bingo_date_night') === 'true';
   });
 
-  // Date Night Wager / Stakes Selection
-  const [selectedWager, setSelectedWager] = useState(WAGER_PRESETS[0]);
-  const [customWager, setCustomWager] = useState('');
-  const [isCustomWager, setIsCustomWager] = useState(false);
-  const activeWager = isCustomWager && customWager.trim() ? customWager.trim() : selectedWager;
+  // Date Night Wager / Stakes Selection (Freeform text)
+  const [customWager, setCustomWager] = useState(() => {
+    return localStorage.getItem('bingo_date_night_wager') || '15-Min Massage 💆';
+  });
+  const activeWager = customWager.trim() || '15-Min Massage 💆';
+
+  // Love Ledger / Date Night Wager Debts History
+  const [wagerHistory, setWagerHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bingo_wager_history_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [activeStatsTab, setActiveStatsTab] = useState('stats'); // 'stats' | 'ledger'
 
   // Best-of Series Match Engine
   const [seriesLength, setSeriesLength] = useState(3); // 1, 3, 5, 7, 10
@@ -218,6 +230,55 @@ export default function App() {
   );
   const placedCount = board.filter((n) => n !== null).length;
   const isBoardFull = placedCount === 25;
+
+  // Love Ledger Derived State
+  const pendingDebts = wagerHistory.filter((item) => item.status === 'pending');
+  const pendingDebtsCount = pendingDebts.length;
+  const yugiOwesCount = pendingDebts.filter((item) => item.loserName === 'Yugi').length;
+  const reniaOwesCount = pendingDebts.filter((item) => item.loserName === 'Renia').length;
+
+  // Handle Wager Text Change
+  const handleWagerChange = (val) => {
+    setCustomWager(val);
+    try {
+      localStorage.setItem('bingo_date_night_wager', val);
+    } catch (e) {}
+  };
+
+  // Toggle Wager Status in Love Ledger
+  const handleToggleWagerStatus = (id) => {
+    setWagerHistory((prev) => {
+      const updated = prev.map((item) => {
+        if (item.id === id) {
+          const nextStatus = item.status === 'pending' ? 'fulfilled' : 'pending';
+          if (nextStatus === 'fulfilled') {
+            playRomanticChime();
+            triggerHaptic([20, 40]);
+            showToast('Penalty fulfilled with love! ❤️');
+          } else {
+            triggerHaptic([15]);
+            showToast('Marked as pending ⏳');
+          }
+          return { ...item, status: nextStatus };
+        }
+        return item;
+      });
+      try {
+        localStorage.setItem('bingo_wager_history_v1', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  // Clear Love Ledger History
+  const handleClearWagerHistory = () => {
+    setWagerHistory([]);
+    try {
+      localStorage.setItem('bingo_wager_history_v1', JSON.stringify([]));
+    } catch (e) {}
+    triggerHaptic([15]);
+    showToast('Love Ledger cleared');
+  };
 
   // Save stats to localStorage
   const saveStats = useCallback((updatedStats) => {
@@ -597,6 +658,37 @@ export default function App() {
           return updated;
         });
 
+        // Log to Date Night Wager History ("Love Ledger")
+        let loserLabel = 'Opponent';
+        if (curIsDateNight) {
+          loserLabel = winnerLabel === 'Yugi' ? 'Renia' : 'Yugi';
+        } else {
+          loserLabel = seriesWinner === 'local' ? curOpponentName : curPlayerName;
+        }
+
+        const newHistoryItem = {
+          id: Date.now().toString(),
+          date: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          }),
+          winnerName: winnerLabel,
+          loserName: loserLabel,
+          finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
+          wager: curActiveWager || '15-Min Massage 💆',
+          status: 'pending'
+        };
+
+        setWagerHistory((prevHistory) => {
+          const updated = [newHistoryItem, ...(prevHistory || [])];
+          try {
+            localStorage.setItem('bingo_wager_history_v1', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+
         setScreen('series_over');
         playWinFanfare();
         fireVictoryConfetti();
@@ -701,7 +793,7 @@ export default function App() {
           setOpponentName(data.name || 'Opponent');
           if (data.seriesLength) setSeriesLength(data.seriesLength);
           if (typeof data.isDateNight === 'boolean') setIsDateNight(data.isDateNight);
-          if (data.wager) setSelectedWager(data.wager);
+          if (data.wager) setCustomWager(data.wager);
           setScreen('playing');
           setTurn(data.turn || 'host');
           setFirstTurnRole(data.turn || 'host');
@@ -1713,8 +1805,28 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-1.5">
+              {isDateNight && (
+                <button
+                  onClick={() => {
+                    setActiveStatsTab('ledger');
+                    setShowStatsModal(true);
+                  }}
+                  className="relative w-9 h-9 rounded-full glass-button flex items-center justify-center text-rose-300 hover:text-white"
+                  title="Love Ledger & Wager Debts"
+                >
+                  <ScrollText size={16} />
+                  {pendingDebtsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center shadow-md animate-pulse">
+                      {pendingDebtsCount}
+                    </span>
+                  )}
+                </button>
+              )}
               <button
-                onClick={() => setShowStatsModal(true)}
+                onClick={() => {
+                  setActiveStatsTab('stats');
+                  setShowStatsModal(true);
+                }}
                 className="w-9 h-9 rounded-full glass-button flex items-center justify-center text-amber-300"
                 title="View Head-to-Head Stats"
               >
@@ -1878,58 +1990,27 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mb-2 p-2.5 rounded-2xl glass-card border border-rose-500/30 space-y-1.5"
+              className="mb-2 p-3 rounded-2xl glass-card border border-rose-500/40 space-y-2 shadow-lg"
             >
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1">
-                  <span>💌 Date Night Wager (Loser's Penalty)</span>
+                <label className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                  <Gift size={12} className="text-amber-400" />
+                  <span>Date Night Wager (Loser's Penalty)</span>
                 </label>
                 <span className="text-[9px] text-amber-300 font-bold">Prize at stake</span>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                {WAGER_PRESETS.map((wager) => (
-                  <button
-                    key={wager}
-                    onClick={() => {
-                      setSelectedWager(wager);
-                      setIsCustomWager(false);
-                      triggerHaptic([10]);
-                    }}
-                    className={`px-2 py-0.5 rounded-xl text-[11px] font-semibold transition border ${
-                      selectedWager === wager && !isCustomWager
-                        ? 'bg-rose-500 border-rose-300 text-white font-bold shadow-md shadow-rose-500/30'
-                        : 'bg-slate-900/60 border-slate-700/50 text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    {wager}
-                  </button>
-                ))}
-                <button
-                  onClick={() => {
-                    setIsCustomWager(true);
-                    triggerHaptic([10]);
-                  }}
-                  className={`px-2 py-0.5 rounded-xl text-[11px] font-semibold transition border ${
-                    isCustomWager
-                      ? 'bg-rose-500 border-rose-300 text-white font-bold shadow-md shadow-rose-500/30'
-                      : 'bg-slate-900/60 border-slate-700/50 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  ✏️ Custom...
-                </button>
-              </div>
-
-              {isCustomWager && (
-                <input
-                  type="text"
-                  maxLength={35}
-                  value={customWager}
-                  onChange={(e) => setCustomWager(e.target.value)}
-                  placeholder="e.g., Loser cooks dinner tomorrow 🍝"
-                  className="w-full bg-slate-900/60 border border-rose-500/50 rounded-xl px-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none"
-                />
-              )}
+              <input
+                type="text"
+                maxLength={45}
+                value={customWager}
+                onChange={(e) => handleWagerChange(e.target.value)}
+                placeholder="What must the loser do? (e.g. 15-min massage, cook dinner, kisses)..."
+                className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl px-3 py-2 text-xs font-semibold text-white placeholder-slate-500 outline-none transition shadow-inner"
+              />
+              <p className="text-[9.5px] text-slate-400">
+                Type any penalty or bet — winner takes all! 💕
+              </p>
             </motion.div>
           )}
 
@@ -2811,13 +2892,23 @@ export default function App() {
               initial={{ scale: 0.9, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 15 }}
-              className="glass-card w-full max-w-sm p-5 space-y-4 border border-white/20 shadow-2xl"
+              className={`glass-card w-full max-w-sm p-4 sm:p-5 space-y-3.5 border shadow-2xl max-h-[88vh] flex flex-col ${
+                isDateNight ? 'border-rose-500/40' : 'border-white/20'
+              }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
-                  <Flame size={20} className="text-amber-400" />
+                  {activeStatsTab === 'ledger' ? (
+                    <ScrollText size={20} className="text-rose-400" />
+                  ) : (
+                    <Flame size={20} className="text-amber-400" />
+                  )}
                   <h3 className="text-base font-black text-white">
-                    {isDateNight ? 'Yugi vs Renia Rivalry' : 'Head-to-Head Stats'}
+                    {isDateNight
+                      ? activeStatsTab === 'ledger'
+                        ? 'The Love Ledger 📜'
+                        : 'Yugi vs Renia Rivalry'
+                      : 'Head-to-Head Stats'}
                   </h3>
                 </div>
                 <button
@@ -2828,70 +2919,208 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Lifetime Series Record */}
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  Series Record
-                </span>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold text-white">
-                    {isDateNight ? 'Yugi 🥂' : playerName}
-                  </span>
-                  <span className="text-base font-black text-amber-400 font-mono">
-                    {isDateNight
-                      ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
-                      : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
-                  </span>
-                  <span className="font-bold text-slate-300">
-                    {isDateNight ? 'Renia 🌹' : opponentName}
-                  </span>
+              {/* Tabs for Date Night: Stats vs Love Ledger */}
+              {isDateNight && (
+                <div className="flex rounded-xl bg-slate-900/80 p-1 border border-rose-500/30 shrink-0">
+                  <button
+                    onClick={() => setActiveStatsTab('stats')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      activeStatsTab === 'stats'
+                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Flame size={13} />
+                    <span>Rivalry Stats</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveStatsTab('ledger')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      activeStatsTab === 'ledger'
+                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <ScrollText size={13} />
+                    <span>Love Ledger</span>
+                    {pendingDebtsCount > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black flex items-center justify-center ml-0.5">
+                        {pendingDebtsCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Total Rounds Record */}
-              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
-                  </span>
-                  <span className="text-base font-extrabold text-white">
-                    {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
-                  </span>
-                  <span className="text-base font-extrabold text-slate-300">
-                    {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
-                  </span>
-                </div>
-              </div>
-
-              {/* Current Streak */}
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                    Current Streak
-                  </span>
-                  <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1">
-                    <Flame size={14} className="text-amber-400" />
-                    <span>
-                      {stats.streakHolder !== 'None'
-                        ? `${stats.streakHolder} (${stats.currentStreak} in a row)`
-                        : 'No active streak'}
+              {/* Tab 1: Rivalry Stats Content */}
+              {activeStatsTab === 'stats' ? (
+                <div className="space-y-3 overflow-y-auto pr-0.5">
+                  {/* Lifetime Series Record */}
+                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      Series Record
                     </span>
-                  </span>
-                </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-bold text-white">
+                        {isDateNight ? 'Yugi 🥂' : playerName}
+                      </span>
+                      <span className="text-base font-black text-amber-400 font-mono">
+                        {isDateNight
+                          ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
+                          : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
+                      </span>
+                      <span className="font-bold text-slate-300">
+                        {isDateNight ? 'Renia 🌹' : opponentName}
+                      </span>
+                    </div>
+                  </div>
 
-                <button
-                  onClick={handleResetStats}
-                  className="px-2.5 py-1.5 rounded-lg glass-button text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
-                >
-                  <RotateCcw size={12} />
-                  <span>Reset</span>
-                </button>
-              </div>
+                  {/* Total Rounds Record */}
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
+                      </span>
+                      <span className="text-base font-extrabold text-white">
+                        {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
+                      </span>
+                      <span className="text-base font-extrabold text-slate-300">
+                        {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Current Streak */}
+                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Current Streak
+                      </span>
+                      <span className="text-sm font-extrabold text-amber-400 flex items-center gap-1">
+                        <Flame size={14} className="text-amber-400" />
+                        <span>
+                          {stats.streakHolder !== 'None'
+                            ? `${stats.streakHolder} (${stats.currentStreak} in a row)`
+                            : 'No active streak'}
+                        </span>
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={handleResetStats}
+                      className="px-2.5 py-1.5 rounded-lg glass-button text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Reset</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Tab 2: Love Ledger Content */
+                <div className="space-y-3 overflow-y-auto pr-0.5 flex-1">
+                  {/* Debts Summary Card */}
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/40 to-amber-950/40 border border-rose-500/40 flex items-center justify-around text-center">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 block">Yugi Owes</span>
+                      <span className="text-base font-black text-amber-400 font-mono">
+                        {yugiOwesCount} {yugiOwesCount === 1 ? 'Debt' : 'Debts'}
+                      </span>
+                    </div>
+                    <div className="w-[1px] h-8 bg-rose-500/30" />
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 block">Renia Owes</span>
+                      <span className="text-base font-black text-rose-300 font-mono">
+                        {reniaOwesCount} {reniaOwesCount === 1 ? 'Debt' : 'Debts'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Wager History List */}
+                  {wagerHistory.length === 0 ? (
+                    <div className="p-6 text-center space-y-2 rounded-2xl bg-slate-900/40 border border-slate-800">
+                      <Heart size={28} className="mx-auto text-rose-400/60" />
+                      <p className="text-xs font-semibold text-slate-200">No debts recorded yet!</p>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Play a Date Night series to crown a champion and log what the loser has to do 💕
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+                      {wagerHistory.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-3 rounded-2xl border transition-all ${
+                            item.status === 'pending'
+                              ? 'bg-rose-950/40 border-rose-500/40 shadow-sm'
+                              : 'bg-slate-900/50 border-slate-700/40 opacity-75'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                            <span className="font-semibold text-slate-300">{item.date}</span>
+                            <span className="font-mono font-bold text-amber-400">
+                              🏆 {item.winnerName} won ({item.finalScore})
+                            </span>
+                          </div>
+
+                          <div className="my-1.5 flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-300 block">
+                                {item.loserName}’s Penalty:
+                              </span>
+                              <span
+                                className={`text-xs font-bold leading-snug block ${
+                                  item.status === 'fulfilled'
+                                    ? 'line-through text-slate-400'
+                                    : 'text-white'
+                                }`}
+                              >
+                                {item.wager}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() => handleToggleWagerStatus(item.id)}
+                              className={`px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0 transition flex items-center gap-1 border ${
+                                item.status === 'pending'
+                                  ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500 hover:text-white'
+                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              }`}
+                            >
+                              {item.status === 'pending' ? (
+                                <>
+                                  <span>⏳ Owed</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Check size={11} className="stroke-[3]" />
+                                  <span>Fulfilled ❤️</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {wagerHistory.length > 0 && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={handleClearWagerHistory}
+                        className="text-[10px] text-slate-400 hover:text-rose-400 transition flex items-center gap-1"
+                      >
+                        <RotateCcw size={10} />
+                        <span>Clear History</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
