@@ -48,21 +48,6 @@ import {
 const PEER_PREFIX = 'bingo25-live-room-';
 const BINGO_LETTERS = ['B', 'I', 'N', 'G', 'O'];
 
-// 12-Line Grid Coordinates for SVG Laser Strike Overlay
-const LINE_COORDINATES = {
-  0: { x1: 3, y1: 10, x2: 97, y2: 10 },
-  1: { x1: 3, y1: 30, x2: 97, y2: 30 },
-  2: { x1: 3, y1: 50, x2: 97, y2: 50 },
-  3: { x1: 3, y1: 70, x2: 97, y2: 70 },
-  4: { x1: 3, y1: 90, x2: 97, y2: 90 },
-  5: { x1: 10, y1: 3, x2: 10, y2: 97 },
-  6: { x1: 30, y1: 3, x2: 30, y2: 97 },
-  7: { x1: 50, y1: 3, x2: 50, y2: 97 },
-  8: { x1: 70, y1: 3, x2: 70, y2: 97 },
-  9: { x1: 90, y1: 3, x2: 90, y2: 97 },
-  10: { x1: 5, y1: 5, x2: 95, y2: 95 },
-  11: { x1: 95, y1: 5, x2: 5, y2: 95 }
-};
 
 const WAGER_PRESETS = [
   '15-Min Massage 💆',
@@ -190,9 +175,6 @@ export default function App() {
   const [lineAlert, setLineAlert] = useState(null);
   const lineAlertTimeoutRef = useRef(null);
 
-  // Floating Micro-Popups over grid (+1 Line! / Bingo!)
-  const [floatingLinePopup, setFloatingLinePopup] = useState(null);
-  const linePopupTimerRef = useRef(null);
 
   // Persistent Head-to-Head Stats
   const [stats, setStats] = useState(() => {
@@ -463,20 +445,6 @@ export default function App() {
       const lineNamesStr =
         newlyCompletedIds.map((id) => LINE_NAMES[id]).join(' & ') || 'a line';
 
-      // Floating micro-popup over grid
-      if (linePopupTimerRef.current) clearTimeout(linePopupTimerRef.current);
-      setFloatingLinePopup({
-        id: Date.now(),
-        text:
-          completedLinesCount >= 5
-            ? '🏆 BINGO!'
-            : `+${completedLinesCount - prevCompletedLinesRef.current} LINE! ${isDateNight ? '💕' : '🔥'}`,
-        subtext: lineNamesStr,
-        isBingo: completedLinesCount >= 5
-      });
-      linePopupTimerRef.current = setTimeout(() => {
-        setFloatingLinePopup(null);
-      }, 1500);
 
       const title =
         completedLinesCount >= 5
@@ -1081,7 +1049,6 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setFloatingLinePopup(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     const nextRound = roundNum || currentRoundRef.current + 1;
@@ -1142,7 +1109,6 @@ export default function App() {
     prevOpponentLinesCountRef.current = 0;
     prevBotCompletedLineIdsRef.current = [];
     setLineAlert(null);
-    setFloatingLinePopup(null);
     setTurn(startingTurn);
     setFirstTurnRole(startingTurn);
     setScreen('playing');
@@ -2578,92 +2544,6 @@ export default function App() {
               })}
             </div>
 
-            {/* Glowing Laser Strike Overlay for Completed Lines */}
-            {isBoardLocked && completedLineIds && completedLineIds.length > 0 && (
-              <svg
-                viewBox="0 0 100 100"
-                className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
-              >
-                <defs>
-                  <filter id="laser-glow-core" x="-30%" y="-30%" width="160%" height="160%">
-                    <feGaussianBlur stdDeviation="1.2" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                  <filter id="laser-glow-halo" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3.2" result="blur" />
-                  </filter>
-                </defs>
-                {completedLineIds.map((lineId) => {
-                  const coords = LINE_COORDINATES[lineId];
-                  if (!coords) return null;
-                  return (
-                    <g key={lineId}>
-                      {/* Outer Neon Glow Beam */}
-                      <motion.line
-                        x1={coords.x1}
-                        y1={coords.y1}
-                        x2={coords.x2}
-                        y2={coords.y2}
-                        stroke={isDateNight ? '#F43F5E' : '#10B981'}
-                        strokeWidth="5.5"
-                        strokeLinecap="round"
-                        filter="url(#laser-glow-halo)"
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: [0, 0.9, 0.6] }}
-                        transition={{ duration: 0.45, ease: 'easeOut' }}
-                      />
-                      {/* Inner Radiant Core Laser Strike */}
-                      <motion.line
-                        x1={coords.x1}
-                        y1={coords.y1}
-                        x2={coords.x2}
-                        y2={coords.y2}
-                        stroke={isDateNight ? '#FDE047' : '#6EE7B7'}
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        filter="url(#laser-glow-core)"
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: 1 }}
-                        transition={{ duration: 0.45, ease: 'easeOut' }}
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
-            )}
-
-            {/* Floating Micro-Popups (+1 Line! / Bingo!) */}
-            <AnimatePresence>
-              {floatingLinePopup && (
-                <motion.div
-                  key={floatingLinePopup.id}
-                  initial={{ opacity: 0, scale: 0.5, y: 15 }}
-                  animate={{ opacity: 1, scale: [0.5, 1.15, 1], y: -15 }}
-                  exit={{ opacity: 0, scale: 0.8, y: -45 }}
-                  transition={{ duration: 1.4, ease: 'easeOut' }}
-                  className={`absolute z-30 pointer-events-none px-4 py-2 rounded-2xl shadow-2xl flex flex-col items-center justify-center border font-black text-center ${
-                    floatingLinePopup.isBingo
-                      ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-amber-400 text-slate-950 border-white shadow-amber-500/50'
-                      : isDateNight
-                      ? 'bg-rose-950/95 text-rose-100 border-rose-400/80 shadow-rose-950/80 ring-2 ring-rose-500/40'
-                      : 'bg-emerald-950/95 text-emerald-100 border-emerald-400/80 shadow-emerald-950/80 ring-2 ring-emerald-500/40'
-                  }`}
-                  style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
-                >
-                  <span className="text-base sm:text-lg tracking-tight drop-shadow font-black">
-                    {floatingLinePopup.text}
-                  </span>
-                  {floatingLinePopup.subtext && (
-                    <span className="text-xs font-bold opacity-90 tracking-wide">
-                      {floatingLinePopup.subtext}
-                    </span>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* In-Game Floating Reactions Emote Bar (Date Night Multiplayer Only) */}
