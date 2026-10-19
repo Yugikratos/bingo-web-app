@@ -40,6 +40,7 @@ import {
   playWinFanfare,
   playShuffleSound,
   playRomanticChime,
+  playPlacementNote,
   toggleSoundMuted,
   getSoundMuted
 } from './utils/sound';
@@ -1390,7 +1391,7 @@ export default function App() {
           return prevBoard;
         }
 
-        playTapSound();
+        playPlacementNote(nextNum, isDateNight);
         triggerHaptic([12]);
         const next = [...prevBoard];
         next[index] = nextNum;
@@ -2515,8 +2516,10 @@ export default function App() {
               const isLast = !isEmpty && lastCalled === number;
 
               return (
-                <button
+                <motion.button
                   key={index}
+                  whileTap={screen === 'playing' && !(isBoardLocked && isCalled) ? { scale: 0.88 } : {}}
+                  transition={{ type: 'spring', stiffness: 500, damping: 18 }}
                   disabled={screen !== 'playing' || (isBoardLocked && isCalled)}
                   onClick={() => handleTileClick(index)}
                   className={`bingo-tile ${
@@ -2532,7 +2535,7 @@ export default function App() {
                   {/* Last Called Pulse Ring */}
                   {isLast && <div className="last-called-ring" />}
                   <span>{isEmpty ? '' : number}</span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -2647,17 +2650,27 @@ export default function App() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 text-xs sm:text-sm font-semibold text-slate-400">
-                  <span>
-                    Calls: <strong className="text-white">{calledNumbers.length}</strong>/25
+                <div className="flex items-center justify-center gap-3.5 text-xs sm:text-sm font-semibold text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    Calls: <strong className="text-white font-mono text-sm">{calledNumbers.length}</strong>/25
                   </span>
                   {lastCalled && (
-                    <>
-                      <span>•</span>
-                      <span>
-                        Last Call: <strong className="text-indigo-300">#{lastCalled}</strong>
-                      </span>
-                    </>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-xs">Last Call:</span>
+                      <motion.div
+                        key={lastCalled}
+                        initial={{ scale: 0.3, rotate: -25, opacity: 0 }}
+                        animate={{ scale: [0.3, 1.28, 1], rotate: 0, opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 550, damping: 16 }}
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs sm:text-sm shadow-lg border ${
+                          isDateNight
+                            ? 'bg-gradient-to-br from-rose-500 via-rose-600 to-amber-500 text-white border-amber-300/60 shadow-rose-950/70'
+                            : 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 text-white border-indigo-300/60 shadow-indigo-950/70'
+                        }`}
+                      >
+                        {lastCalled}
+                      </motion.div>
+                    </div>
                   )}
                 </div>
               )}
@@ -2826,13 +2839,25 @@ export default function App() {
               {/* Action Buttons */}
               <div className="space-y-2.5 pt-1">
                 {isDateNight && (
-                  <button
-                    onClick={() => setShowPolaroidModal(true)}
-                    className="w-full py-3 rounded-2xl glass-button text-sm font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-2 hover:bg-rose-950/40 shadow-md"
-                  >
-                    <Camera size={16} />
-                    <span>View Date Night Polaroid 📸</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowPolaroidModal(true)}
+                      className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-1.5 hover:bg-rose-950/40 shadow-md"
+                    >
+                      <Camera size={15} />
+                      <span>Polaroid 📸</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveStatsTab('ledger');
+                        setShowStatsModal(true);
+                      }}
+                      className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-amber-300 border-amber-400/40 flex items-center justify-center gap-1.5 hover:bg-amber-950/40 shadow-md"
+                    >
+                      <ScrollText size={15} />
+                      <span>Love Ledger 📜</span>
+                    </button>
+                  </div>
                 )}
 
                 <motion.button

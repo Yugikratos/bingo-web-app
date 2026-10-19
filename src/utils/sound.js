@@ -255,3 +255,47 @@ export function playRomanticChime() {
     // Graceful fallback
   }
 }
+
+/**
+ * 7. playPlacementNote: Ascending pentatonic note when placing numbers 1 to 25
+ * Makes sequential board filling sound like a cheerful kalimba / music box
+ */
+export function playPlacementNote(number = 1, isDateNight = false) {
+  if (isMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // Major Pentatonic scale notes across octaves (C4 to A7)
+    const baseFreqs = [
+      261.63, 293.66, 329.63, 392.00, 440.00, // C4 - A4 (1-5)
+      523.25, 587.33, 659.25, 783.99, 880.00, // C5 - A5 (6-10)
+      1046.50, 1174.66, 1318.51, 1567.98, 1760.00, // C6 - A6 (11-15)
+      2093.00, 2349.32, 2637.02, 3135.96, 3520.00, // C7 - A7 (16-20)
+      3520.00, 3920.00, 4186.01, 4698.63, 5274.04  // Harmonic peak (21-25)
+    ];
+
+    const idx = Math.max(0, Math.min(24, (number || 1) - 1));
+    const freq = baseFreqs[idx];
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = isDateNight ? 'sine' : 'triangle';
+    const now = ctx.currentTime;
+
+    osc.frequency.setValueAtTime(freq, now);
+
+    const dur = isDateNight ? 0.22 : 0.16;
+    gain.gain.setValueAtTime(isDateNight ? 0.24 : 0.26, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + dur);
+  } catch (err) {
+    // Graceful fallback
+  }
+}
