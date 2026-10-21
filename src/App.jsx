@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, LayoutGroup, useAnimation } from 'framer-motion';
 import { Peer } from 'peerjs';
 import confetti from 'canvas-confetti';
@@ -32,7 +32,15 @@ import {
   ScrollText,
   Gift
 } from 'lucide-react';
-import { generateBoard, evaluateBoard, getBestBotMove, LINE_NAMES, WIN_LINES, METEOR_LINE_COORDS } from './utils/bingoEngine';
+import {
+  generateBoard,
+  evaluateBoard,
+  getBestBotMove,
+  LINE_NAMES,
+  WIN_LINES,
+  METEOR_LINE_COORDS,
+  getTensionTiles
+} from './utils/bingoEngine';
 import {
   playTapSound,
   playOpponentTapSound,
@@ -49,6 +57,7 @@ import SplitText from './components/ui/SplitText';
 import RippleButton from './components/ui/RippleButton';
 import GlareCard from './components/ui/GlareCard';
 import MeteorRay from './components/ui/MeteorRay';
+import HeroOrb from './components/ui/HeroOrb';
 
 const PEER_PREFIX = 'bingo25-v4-';
 
@@ -312,6 +321,27 @@ export default function App() {
   // Evaluation of current board
   const { completedLinesCount, winningTileIndices, completedLineIds, completedLineNames } = evaluateBoard(board, calledNumbers);
   const targetWins = getTargetWins(seriesLength);
+
+  // Opponent Imminent Threat Indicator (4/5 lines claimed)
+  const isOpponentThreat = isBoardLocked && opponentLinesCount >= 4;
+
+  // Clicked tile indices on player's board (0..24)
+  const clickedTileIndices = useMemo(() => {
+    const calledSet = new Set(calledNumbers);
+    const indices = [];
+    board.forEach((num, idx) => {
+      if (num !== null && calledSet.has(num)) {
+        indices.push(idx);
+      }
+    });
+    return indices;
+  }, [board, calledNumbers]);
+
+  // Progressive tension tile indices (unclicked tiles exactly 1 tap away from completing a line)
+  const tensionTileIndices = useMemo(() => {
+    if (!isBoardLocked || screen !== 'playing') return new Set();
+    return new Set(getTensionTiles(clickedTileIndices, WIN_LINES));
+  }, [clickedTileIndices, isBoardLocked, screen]);
 
   // Pre-Game Setup Derived State
   const unplacedNumbers = Array.from({ length: 25 }, (_, i) => i + 1).filter(
@@ -2111,6 +2141,9 @@ export default function App() {
       {/* Film Grain Texture Overlay */}
       <div className="noise-overlay" aria-hidden="true" />
 
+      {/* Full-Screen Vignette & Cinematic Depth Overlay */}
+      <div className="fixed inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.8)] z-0" aria-hidden="true" />
+
       {/* Floating Reaction Emotes */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         {floatingEmotes.map((item) => (
@@ -2783,26 +2816,45 @@ export default function App() {
 
           {/* Series Head-to-Head Scoreboard Card */}
           <div
-            className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 ${
-              isDateNight
+            className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 transition-all duration-300 ${
+              isOpponentThreat
+                ? isDateNight
+                  ? 'bg-rose-950/60 border-rose-500/70 shadow-[0_0_18px_rgba(244,63,94,0.35)]'
+                  : 'bg-slate-900/80 border-rose-500/60 shadow-[0_0_18px_rgba(239,68,68,0.3)]'
+                : isDateNight
                 ? 'bg-rose-950/40 border-rose-500/30'
                 : 'bg-slate-900/60 border-slate-700/50'
             }`}
           >
             {/* Player 1 (Local) */}
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {isDateNight ? (
                 <Heart size={16} className="text-rose-400 fill-rose-400 shrink-0" />
               ) : (
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
               )}
-              <div className="min-w-0">
-                <span className="font-bold text-xs sm:text-sm text-white truncate block max-w-[85px] sm:max-w-[110px]">
-                  {playerName}
-                </span>
-                <span className="text-[10px] text-slate-400 font-semibold block">
-                  {completedLinesCount}/5 lines
-                </span>
+              <div className="min-w-0 flex-1 max-w-[95px] sm:max-w-[125px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs sm:text-sm text-white truncate block">
+                    {playerName}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold font-mono ml-1 shrink-0">
+                    {completedLinesCount}/5
+                  </span>
+                </div>
+                {/* Player 1 Sleek Progress Bar */}
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+                  <motion.div
+                    className={`h-full rounded-full ${
+                      isDateNight
+                        ? 'bg-gradient-to-r from-rose-500 to-amber-400'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                    }`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (completedLinesCount / 5) * 100)}%` }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                  />
+                </div>
               </div>
               <span
                 className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
@@ -2813,12 +2865,12 @@ export default function App() {
               </span>
             </div>
 
-            <div className="text-[11px] font-black uppercase text-slate-500 tracking-wider px-1">
+            <div className="text-[11px] font-black uppercase text-slate-500 tracking-wider px-1.5">
               VS
             </div>
 
             {/* Player 2 (Opponent) */}
-            <div className="flex items-center gap-2 min-w-0 justify-end">
+            <div className="flex items-center gap-2 min-w-0 justify-end flex-1">
               <span
                 className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
                   isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
@@ -2826,31 +2878,92 @@ export default function App() {
               >
                 {opponentScore}
               </span>
-              <div className="text-right min-w-0">
-                <span className="font-bold text-xs sm:text-sm text-slate-300 truncate block max-w-[85px] sm:max-w-[110px]">
-                  {opponentName}
-                </span>
-                {/* Opponent 5 dots */}
-                <div className="flex items-center justify-end gap-1">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <span
-                      key={i}
-                      className={`w-2 h-2 rounded-full transition-colors ${
-                        i < opponentLinesCount
-                          ? isDateNight
-                            ? 'bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]'
-                            : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
-                          : 'bg-slate-700/80 border border-slate-600/40'
-                      }`}
-                    />
-                  ))}
-                  <span className="text-[10px] font-mono text-slate-400 ml-0.5">({opponentLinesCount}/5)</span>
+              <div className="text-right min-w-0 flex-1 max-w-[95px] sm:max-w-[125px]">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-[10px] font-semibold font-mono mr-1 shrink-0 ${
+                      isOpponentThreat ? 'text-amber-300 font-black' : 'text-slate-400'
+                    }`}
+                  >
+                    {opponentLinesCount}/5
+                  </span>
+                  <span
+                    className={`font-bold text-xs sm:text-sm truncate block ${
+                      isOpponentThreat ? 'text-rose-300 font-black animate-pulse' : 'text-slate-300'
+                    }`}
+                  >
+                    {opponentName}
+                  </span>
+                </div>
+                {/* Opponent Progress Bar with Imminent Threat Heat Aura */}
+                <div
+                  className={`w-full h-1.5 rounded-full overflow-hidden mt-1 transition-all ${
+                    isOpponentThreat
+                      ? 'bg-rose-950/80 ring-1 ring-rose-500/80 shadow-[0_0_10px_rgba(244,63,94,0.8)]'
+                      : 'bg-white/10'
+                  }`}
+                >
+                  <motion.div
+                    className={`h-full rounded-full ${
+                      isOpponentThreat
+                        ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-600 shadow-[0_0_8px_rgba(239,68,68,0.9)]'
+                        : isDateNight
+                        ? 'bg-gradient-to-r from-amber-400 to-rose-400'
+                        : 'bg-gradient-to-r from-indigo-400 to-purple-500'
+                    }`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (opponentLinesCount / 5) * 100)}%` }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                  />
                 </div>
               </div>
+
+              {/* Opponent Avatar with Imminent Threat Pulse */}
               {isDateNight ? (
-                <Heart size={16} className="text-amber-400 fill-amber-400 shrink-0" />
+                <motion.div
+                  animate={
+                    isOpponentThreat
+                      ? {
+                          scale: [1, 1.25, 1],
+                          filter: [
+                            'drop-shadow(0 0 3px rgba(244,63,94,0.6))',
+                            'drop-shadow(0 0 12px rgba(244,63,94,1))',
+                            'drop-shadow(0 0 3px rgba(244,63,94,0.6))'
+                          ]
+                        }
+                      : {}
+                  }
+                  transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
+                  className="shrink-0"
+                >
+                  <Heart
+                    size={16}
+                    className={
+                      isOpponentThreat
+                        ? 'text-rose-400 fill-rose-500'
+                        : 'text-amber-400 fill-amber-400'
+                    }
+                  />
+                </motion.div>
               ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0" />
+                <motion.span
+                  animate={
+                    isOpponentThreat
+                      ? {
+                          scale: [1, 1.3, 1],
+                          boxShadow: [
+                            '0 0 4px rgba(239,68,68,0.6)',
+                            '0 0 16px rgba(239,68,68,1)',
+                            '0 0 4px rgba(239,68,68,0.6)'
+                          ]
+                        }
+                      : {}
+                  }
+                  transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                    isOpponentThreat ? 'bg-red-500' : 'bg-indigo-400'
+                  }`}
+                />
               )}
             </div>
           </div>
@@ -2965,6 +3078,7 @@ export default function App() {
                     const isLast = !isEmpty && lastCalled === number;
                     const isNewlyCompleted = dominoTiles[index] !== undefined;
                     const positionInLine = dominoTiles[index] ?? 0;
+                    const isTension = tensionTileIndices.has(index);
 
                     return (
                       <motion.button
@@ -2984,6 +3098,16 @@ export default function App() {
                                   ease: 'easeOut'
                                 }
                               }
+                            : isTension
+                            ? {
+                                scale: [1, 1.05, 1],
+                                boxShadow: [
+                                  '0px 0px 0px rgba(251,191,36,0)',
+                                  '0px 0px 20px rgba(251,191,36,0.6)',
+                                  '0px 0px 0px rgba(251,191,36,0)'
+                                ],
+                                transition: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+                              }
                             : {}
                         }
                         whileTap={
@@ -3000,13 +3124,41 @@ export default function App() {
                             ? 'winning'
                             : isCalled
                             ? 'called'
+                            : isTension
+                            ? 'uncalled ring-1 ring-amber-400/50'
                             : 'uncalled'
                         }`}
                         style={{ transformStyle: 'preserve-3d' }}
                       >
+                        {/* Themed Dauber Stamp (Physical Pressed Glass) */}
+                        {isCalled && (
+                          <motion.div
+                            initial={{ scale: 3, opacity: 0, rotate: -15 }}
+                            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
+                          >
+                            {isDateNight ? (
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-8 h-8 sm:w-10 sm:h-10 text-rose-400/40 fill-current drop-shadow-[0_0_10px_rgba(244,63,94,0.75)]"
+                              >
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                              </svg>
+                            ) : (
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-300/35 fill-current drop-shadow-[0_0_10px_rgba(129,140,248,0.75)]"
+                              >
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                              </svg>
+                            )}
+                          </motion.div>
+                        )}
+
                         {/* Last Called Pulse Ring */}
                         {isLast && <div className="last-called-ring" />}
-                        <span className="font-display">{isEmpty ? '' : number}</span>
+                        <span className="relative z-10 font-display">{isEmpty ? '' : number}</span>
                       </motion.button>
                     );
                   })}
@@ -3142,26 +3294,14 @@ export default function App() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3.5 text-xs sm:text-sm font-semibold text-slate-400">
+                <div className="flex items-center justify-center gap-4 text-xs sm:text-sm font-semibold text-slate-400 py-1">
                   <span className="flex items-center gap-1.5">
                     Calls: <strong className="text-white font-mono text-sm">{calledNumbers.length}</strong>/25
                   </span>
                   {lastCalled && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400 text-xs">Last Call:</span>
-                      <motion.div
-                        key={lastCalled}
-                        initial={{ scale: 0.3, rotate: -25, opacity: 0 }}
-                        animate={{ scale: [0.3, 1.28, 1], rotate: 0, opacity: 1 }}
-                        transition={{ type: 'spring', stiffness: 550, damping: 16 }}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs sm:text-sm shadow-lg border ${
-                          isDateNight
-                            ? 'bg-gradient-to-br from-rose-500 via-rose-600 to-amber-500 text-white border-amber-300/60 shadow-rose-950/70'
-                            : 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 text-white border-indigo-300/60 shadow-indigo-950/70'
-                        }`}
-                      >
-                        {lastCalled}
-                      </motion.div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Last Call:</span>
+                      <HeroOrb key={lastCalled} number={lastCalled} isDateNight={isDateNight} />
                     </div>
                   )}
                 </div>
@@ -3181,7 +3321,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xl"
           >
             <motion.div
               initial={{ scale: 0.88, y: 15 }}
@@ -3266,7 +3406,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xl"
           >
             <motion.div
               initial={{ scale: 0.85, y: 20 }}
@@ -3395,7 +3535,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xl"
           >
             <motion.div
               initial={{ scale: 0.9, y: 15 }}
@@ -3642,7 +3782,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xl"
           >
             <motion.div
               initial={{ scale: 0.85, y: 20 }}

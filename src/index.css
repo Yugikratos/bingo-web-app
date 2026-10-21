@@ -184,6 +184,7 @@ html, body {
 /* Grid Tile Styling (Larger, Punchy Font) */
 .bingo-tile {
   position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;

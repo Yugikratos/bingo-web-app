@@ -187,3 +187,27 @@ export function getBestBotMove(botBoard, calledNumbers) {
   const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
   return chosen.num;
 }
+
+/**
+ * Progressive Tension Glow ("Sweat" Mechanic)
+ * Returns an array of unclicked tile indices that are exactly 1 tap away from completing a line.
+ * (i.e. the other 4 tiles in the winning line are already clicked/called)
+ *
+ * @param {Set<number>|number[]} clickedTiles - Set or Array of clicked/called tile indices (0..24)
+ * @param {number[][]} winLines - Array of 5-tile line index tuples (defaults to WIN_LINES)
+ * @returns {number[]} Array of unique tile indices in tension
+ */
+export function getTensionTiles(clickedTiles, winLines = WIN_LINES) {
+  if (!clickedTiles) return [];
+  const clickedSet = clickedTiles instanceof Set ? clickedTiles : new Set(clickedTiles);
+  const tension = new Set();
+
+  winLines.forEach((line) => {
+    const unclickedInLine = line.filter((idx) => !clickedSet.has(idx));
+    if (unclickedInLine.length === 1) {
+      tension.add(unclickedInLine[0]);
+    }
+  });
+
+  return Array.from(tension);
+}
