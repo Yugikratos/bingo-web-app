@@ -16,18 +16,11 @@ import {
   ArrowLeft,
   Sparkles,
   AlertCircle,
-  HelpCircle,
-  Award,
   Heart,
   Flame,
   RotateCcw,
-  Star,
   Swords,
-  Bell,
   Camera,
-  Smile,
-  Send,
-  Download,
   Lock,
   ScrollText,
   Gift
@@ -44,7 +37,6 @@ import {
 import {
   playTapSound,
   playOpponentTapSound,
-  playLineCompleteSound,
   playSweepSound,
   playWinFanfare,
   playShuffleSound,
@@ -162,15 +154,11 @@ function FloatingParticles() {
 
 const DEFAULT_STATS = {
   totalSeriesPlayed: 0,
-  localSeriesWon: 0,
-  opponentSeriesWon: 0,
-  totalRoundsPlayed: 0,
-  localRoundsWon: 0,
-  opponentRoundsWon: 0,
   yugiSeriesWon: 0,
-  reniaSeriesWon: 0,
+  raniaSeriesWon: 0,
+  totalRoundsPlayed: 0,
   yugiRoundsWon: 0,
-  reniaRoundsWon: 0,
+  raniaRoundsWon: 0,
   currentStreak: 0,
   streakHolder: 'None'
 };
@@ -179,18 +167,11 @@ export default function App() {
   // Navigation / Game State Machine: 'lobby' | 'waiting' | 'playing' | 'round_over' | 'series_over'
   const [screen, setScreen] = useState('lobby');
 
-  // Exclusive "Date Night" Mode (Yugi & Renia)
-  const [isDateNight, setIsDateNight] = useState(() => {
-    return localStorage.getItem('bingo_date_night') === 'true';
-  });
-
-  // Date Night Wager / Stakes Selection (Freeform text)
+  // Mandatory Love Ledger Wager / Stakes Selection (Task 3)
   const [customWager, setCustomWager] = useState(() => {
-    const saved = localStorage.getItem('bingo_date_night_wager');
-    if (!saved || saved === '15-Min Massage 💆') return '';
-    return saved;
+    return localStorage.getItem('bingo_date_night_wager') || '15-Min Massage 💆';
   });
-  const activeWager = customWager.trim() || 'Sweet Reward 💕';
+  const activeWager = customWager.trim() || '15-Min Massage 💆';
 
   // Love Ledger / Date Night Wager Debts History
   const [wagerHistory, setWagerHistory] = useState(() => {
@@ -209,21 +190,18 @@ export default function App() {
   const [localScore, setLocalScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
 
-  // Player identity
-  const [playerName, setPlayerName] = useState(() => {
-    return localStorage.getItem('bingo_player_name') || 'Yugi';
-  });
-  const [opponentName, setOpponentName] = useState(() => {
-    return isDateNight ? (playerName === 'Renia' ? 'Yugi' : 'Renia') : 'Opponent';
-  });
-
   // Multiplayer Connection State
-  const [role, setRole] = useState('host'); // 'host' | 'guest' | 'solo'
+  const [role, setRole] = useState('host'); // 'host' (Yugi) | 'guest' (Rania) | 'solo' (Yugi vs Rania AI)
   const [roomCode, setRoomCode] = useState('');
   const [inputCode, setInputCode] = useState('');
   const [isUrlJoin, setIsUrlJoin] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('idle'); // 'idle' | 'connecting' | 'connected' | 'error'
   const [peerError, setPeerError] = useState('');
+
+  // Exclusive Hardcoded Identities (Task 1):
+  // Host is always "Yugi", Guest is always "Rania"
+  const playerName = role === 'guest' ? 'Rania' : 'Yugi';
+  const opponentName = role === 'guest' ? 'Yugi' : 'Rania';
 
   // Audio mute state
   const [isMuted, setIsMuted] = useState(getSoundMuted());
@@ -231,7 +209,7 @@ export default function App() {
   // Game Board & Logic State (Pre-game manual on-tap sequential fill by default)
   const [board, setBoard] = useState(() => Array(25).fill(null));
   const [botBoard, setBotBoard] = useState(() => generateBoard());
-  const [setupMode, setSetupMode] = useState('manual'); // 'manual' | 'auto'
+  const [, setSetupMode] = useState('manual'); // 'manual' | 'auto'
   const [isBoardLocked, setIsBoardLocked] = useState(false);
   const [calledNumbers, setCalledNumbers] = useState([]);
   const [lastCalled, setLastCalled] = useState(null);
@@ -262,11 +240,21 @@ export default function App() {
   const gridContainerRef = useRef(null);
   const shakeControls = useAnimation();
 
-  // Persistent Head-to-Head Stats
+  // Persistent Head-to-Head Stats (Yugi & Rania Exclusive)
   const [stats, setStats] = useState(() => {
     try {
       const saved = localStorage.getItem('bingo_h2h_stats_v2');
-      return saved ? { ...DEFAULT_STATS, ...JSON.parse(saved) } : DEFAULT_STATS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_STATS,
+          ...parsed,
+          raniaSeriesWon: parsed.raniaSeriesWon ?? parsed.reniaSeriesWon ?? 0,
+          raniaRoundsWon: parsed.raniaRoundsWon ?? parsed.reniaRoundsWon ?? 0,
+          streakHolder: parsed.streakHolder === 'Renia' ? 'Rania' : (parsed.streakHolder || 'None')
+        };
+      }
+      return DEFAULT_STATS;
     } catch (e) {
       return DEFAULT_STATS;
     }
@@ -296,7 +284,6 @@ export default function App() {
   const calledNumbersRef = useRef(calledNumbers);
   const playerNameRef = useRef(playerName);
   const opponentNameRef = useRef(opponentName);
-  const isDateNightRef = useRef(isDateNight);
   const localScoreRef = useRef(localScore);
   const opponentScoreRef = useRef(opponentScore);
   const seriesLengthRef = useRef(seriesLength);
@@ -311,7 +298,6 @@ export default function App() {
   useEffect(() => { calledNumbersRef.current = calledNumbers; }, [calledNumbers]);
   useEffect(() => { playerNameRef.current = playerName; }, [playerName]);
   useEffect(() => { opponentNameRef.current = opponentName; }, [opponentName]);
-  useEffect(() => { isDateNightRef.current = isDateNight; }, [isDateNight]);
   useEffect(() => { localScoreRef.current = localScore; }, [localScore]);
   useEffect(() => { opponentScoreRef.current = opponentScore; }, [opponentScore]);
   useEffect(() => { seriesLengthRef.current = seriesLength; }, [seriesLength]);
@@ -319,7 +305,7 @@ export default function App() {
   useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
 
   // Evaluation of current board
-  const { completedLinesCount, winningTileIndices, completedLineIds, completedLineNames } = evaluateBoard(board, calledNumbers);
+  const { completedLinesCount, winningTileIndices, completedLineIds } = evaluateBoard(board, calledNumbers);
   const targetWins = getTargetWins(seriesLength);
 
   // Opponent Imminent Threat Indicator (4/5 lines claimed)
@@ -344,9 +330,6 @@ export default function App() {
   }, [clickedTileIndices, isBoardLocked, screen]);
 
   // Pre-Game Setup Derived State
-  const unplacedNumbers = Array.from({ length: 25 }, (_, i) => i + 1).filter(
-    (n) => !board.includes(n)
-  );
   const nextSequentialNumber = (() => {
     for (let i = 1; i <= 25; i++) {
       if (!board.includes(i)) return i;
@@ -360,7 +343,7 @@ export default function App() {
   const pendingDebts = wagerHistory.filter((item) => item.status === 'pending');
   const pendingDebtsCount = pendingDebts.length;
   const yugiOwesCount = pendingDebts.filter((item) => item.loserName === 'Yugi').length;
-  const reniaOwesCount = pendingDebts.filter((item) => item.loserName === 'Renia').length;
+  const raniaOwesCount = pendingDebts.filter((item) => item.loserName === 'Rania' || item.loserName === 'Renia').length;
 
   // Handle Wager Text Change
   const handleWagerChange = (val) => {
@@ -478,12 +461,6 @@ export default function App() {
     }
   };
 
-  // Sync player name changes
-  const handleNameChange = (newName) => {
-    setPlayerName(newName);
-    localStorage.setItem('bingo_player_name', newName);
-  };
-
   // Sound toggle handler
   const handleToggleMute = () => {
     const nextMuted = toggleSoundMuted();
@@ -491,35 +468,7 @@ export default function App() {
     showToast(nextMuted ? 'Sound Muted' : 'Sound Enabled');
   };
 
-  // Date Night Mode toggle handler
-  const handleToggleDateNight = () => {
-    const nextVal = !isDateNight;
-    setIsDateNight(nextVal);
-    localStorage.setItem('bingo_date_night', String(nextVal));
-
-    if (nextVal) {
-      if (playerName !== 'Yugi' && playerName !== 'Renia') {
-        handleNameChange('Yugi');
-      }
-      setOpponentName(playerName === 'Renia' ? 'Yugi' : 'Renia');
-      playRomanticChime();
-      showToast('Date Night Mode Activated! ❤️');
-    } else {
-      showToast('Classic Mode Activated');
-    }
-  };
-
-  // Quick switch between Yugi & Renia
-  const handleSelectPersona = (persona) => {
-    handleNameChange(persona);
-    const nextOpponent = persona === 'Yugi' ? 'Renia' : 'Yugi';
-    setOpponentName(nextOpponent);
-    playRomanticChime();
-    triggerHaptic([20]);
-    showToast(`Playing as ${persona} 💕`);
-  };
-
-  // Inspect URL for auto-join room code on mount
+  // Inspect URL for auto-join room code on mount (Task 1: Guest is permanently Rania)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -527,6 +476,7 @@ export default function App() {
       if (urlRoom && /^\d{4}$/.test(urlRoom)) {
         setInputCode(urlRoom);
         setIsUrlJoin(true);
+        setRole('guest'); // Guest is permanently Rania
       }
     } catch (e) {}
   }, []);
@@ -551,9 +501,7 @@ export default function App() {
     if (!gridEl) return;
     const rect = gridEl.getBoundingClientRect();
 
-    const colors = isDateNight
-      ? ['#F43F5E', '#FDA4AF', '#FBBF24', '#FEF08A', '#FFFFFF']
-      : ['#10B981', '#6EE7B7', '#FBBF24', '#FEF08A', '#FFFFFF'];
+    const colors = ['#F43F5E', '#FDA4AF', '#FBBF24', '#FEF08A', '#FFFFFF'];
 
     // Fire 3 staggered gentle embers along the meteor path (start -> middle -> end) over 400ms
     const points = [0.2, 0.5, 0.8];
@@ -581,17 +529,13 @@ export default function App() {
         } catch (e) {}
       }, idx * 160);
     });
-  }, [isDateNight]);
+  }, []);
 
   // Track completed lines to play chime & trigger prominent banner
   useEffect(() => {
     if (isBoardLocked && completedLinesCount > prevCompletedLinesRef.current && screen === 'playing') {
       triggerHaptic([30, 45, 30]);
-      if (isDateNight) {
-        playRomanticChime();
-      } else {
-        playLineCompleteSound();
-      }
+      playRomanticChime();
 
       // Identify newly completed line(s)
       const newlyCompletedIds = (completedLineIds || []).filter(
@@ -602,7 +546,7 @@ export default function App() {
 
       // Trigger Staggered Domino Wave + Meteor Ray Sweep + Soft Embers
       if (newlyCompletedIds.length > 0) {
-        playSweepSound(isDateNight);
+        playSweepSound();
         triggerHaptic([25, 40, 55]);
         shakeControls.start({
           x: [0, -6, 7, -4, 4, -2, 2, 0],
@@ -644,23 +588,17 @@ export default function App() {
 
       const title =
         completedLinesCount >= 5
-          ? isDateNight
-            ? '🏆 BINGO! YOU CLAIMED 5 LINES! ❤️'
-            : '🏆 BINGO! YOU COMPLETED 5 LINES!'
+          ? '🏆 BINGO! YOU CLAIMED 5 LINES! ❤️'
           : completedLinesCount === 4
           ? `🚨 4 LINES DOWN! Claimed ${lineNamesStr}!`
-          : isDateNight
-          ? `❤️ You claimed ${lineNamesStr}! (${completedLinesCount}/5)`
-          : `✨ You completed ${lineNamesStr}! (${completedLinesCount}/5)`;
+          : `❤️ You claimed ${lineNamesStr}! (${completedLinesCount}/5)`;
 
       const subtitle =
         completedLinesCount >= 5
           ? 'Victory is sealed! 🥂'
           : completedLinesCount === 4
           ? 'Hold your breath! 1 more line to BINGO! 💓'
-          : isDateNight
-          ? 'One step closer to victory, my love. 💕'
-          : `You have completed ${completedLinesCount} of 5 lines.`;
+          : 'One step closer to victory, my love. 💕';
 
       triggerLineAlert({
         title,
@@ -683,59 +621,43 @@ export default function App() {
     }
     prevCompletedLinesRef.current = completedLinesCount;
     prevCompletedLineIdsRef.current = completedLineIds || [];
-  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, isDateNight, playerName, triggerLineAlert, triggerLineSparks, shakeControls]);
+  }, [completedLinesCount, completedLineIds, screen, isBoardLocked, playerName, triggerLineAlert, triggerLineSparks, shakeControls]);
 
   // Confetti celebrations
   const fireVictoryConfetti = useCallback(() => {
     triggerHaptic([50, 70, 50, 70, 120]);
-    if (isDateNight) {
-      let heartShape = null;
-      try {
-        if (typeof confetti.shapeFromPath === 'function') {
-          heartShape = confetti.shapeFromPath({
-            path: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
-          });
-        }
-      } catch (e) {}
+    let heartShape = null;
+    try {
+      if (typeof confetti.shapeFromPath === 'function') {
+        heartShape = confetti.shapeFromPath({
+          path: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
+        });
+      }
+    } catch (e) {}
 
-      const shapes = heartShape ? [heartShape, 'circle'] : ['circle'];
-      const colors = ['#F43F5E', '#E11D48', '#BE123C', '#FBBF24', '#FDA4AF', '#FFF1F2'];
+    const shapes = heartShape ? [heartShape, 'circle'] : ['circle'];
+    const colors = ['#F43F5E', '#E11D48', '#BE123C', '#FBBF24', '#FDA4AF', '#FFF1F2'];
 
+    confetti({
+      particleCount: 80,
+      spread: 60,
+      origin: { y: 0.6 },
+      shapes,
+      colors,
+      scalar: 1.3
+    });
+
+    setTimeout(() => {
       confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 },
+        particleCount: 120,
+        spread: 90,
+        origin: { y: 0.5 },
         shapes,
         colors,
-        scalar: 1.3
+        scalar: 1.4
       });
-
-      setTimeout(() => {
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          origin: { y: 0.5 },
-          shapes,
-          colors,
-          scalar: 1.4
-        });
-      }, 260);
-    } else {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.65 }
-      });
-      setTimeout(() => {
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          origin: { y: 0.55 },
-          colors: ['#FBBF24', '#10B981', '#6366F1', '#EC4899']
-        });
-      }, 300);
-    }
-  }, [isDateNight]);
+    }, 260);
+  }, []);
 
   // Record a round win and evaluate series outcome
   const recordRoundResult = useCallback(
@@ -755,21 +677,21 @@ export default function App() {
 
       const curPlayerName = playerNameRef.current;
       const curOpponentName = opponentNameRef.current;
-      const curIsDateNight = isDateNightRef.current;
       const curSeriesLength = seriesLengthRef.current;
       const curActiveWager = activeWagerRef.current;
       const curCurrentRound = currentRoundRef.current;
       const curTargetWins = getTargetWins(curSeriesLength);
 
-      // Identify winner by name for lifetime Yugi vs Renia tally
+      // Identify winner by name for lifetime Yugi vs Rania tally
       const winnerIsYugi =
         winnerDisplay.includes('Yugi') ||
         (winnerRole === 'local' && curPlayerName === 'Yugi') ||
         (winnerRole === 'opponent' && curOpponentName.includes('Yugi'));
-      const winnerIsRenia =
+      const winnerIsRania =
+        winnerDisplay.includes('Rania') ||
         winnerDisplay.includes('Renia') ||
-        (winnerRole === 'local' && curPlayerName === 'Renia') ||
-        (winnerRole === 'opponent' && curOpponentName.includes('Renia'));
+        (winnerRole === 'local' && (curPlayerName === 'Rania' || curPlayerName === 'Renia')) ||
+        (winnerRole === 'opponent' && (curOpponentName.includes('Rania') || curOpponentName.includes('Renia')));
 
       // Update rounds in persistent stats
       setStats((prev) => {
@@ -787,9 +709,9 @@ export default function App() {
           yugiRoundsWon: winnerIsYugi
             ? (prev.yugiRoundsWon || 0) + 1
             : prev.yugiRoundsWon || 0,
-          reniaRoundsWon: winnerIsRenia
-            ? (prev.reniaRoundsWon || 0) + 1
-            : prev.reniaRoundsWon || 0
+          raniaRoundsWon: winnerIsRania
+            ? (prev.raniaRoundsWon || 0) + 1
+            : prev.raniaRoundsWon || 0
         };
         try {
           localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
@@ -824,18 +746,16 @@ export default function App() {
           name: seriesWinnerName,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
           wager: curActiveWager,
-          reason: curIsDateNight
-            ? romanticSeriesReason
-            : `${seriesWinnerName} won the Best of ${curSeriesLength} Series!`
+          reason: romanticSeriesReason
         });
 
-        // Determine if Yugi or Renia clinched the series for named stats
+        // Determine if Yugi or Rania clinched the series for named stats
         const seriesWinnerIsYugi = seriesWinnerName.includes('Yugi');
-        const seriesWinnerIsRenia = seriesWinnerName.includes('Renia');
+        const seriesWinnerIsRania = seriesWinnerName.includes('Rania') || seriesWinnerName.includes('Renia');
         const winnerLabel = seriesWinnerIsYugi
           ? 'Yugi'
-          : seriesWinnerIsRenia
-          ? 'Renia'
+          : seriesWinnerIsRania
+          ? 'Rania'
           : seriesWinner;
 
         // Update series in persistent stats
@@ -855,9 +775,9 @@ export default function App() {
             yugiSeriesWon: seriesWinnerIsYugi
               ? (prev.yugiSeriesWon || 0) + 1
               : prev.yugiSeriesWon || 0,
-            reniaSeriesWon: seriesWinnerIsRenia
-              ? (prev.reniaSeriesWon || 0) + 1
-              : prev.reniaSeriesWon || 0,
+            raniaSeriesWon: seriesWinnerIsRania
+              ? (prev.raniaSeriesWon || 0) + 1
+              : prev.raniaSeriesWon || 0,
             currentStreak: newStreak,
             streakHolder: winnerLabel
           };
@@ -868,12 +788,7 @@ export default function App() {
         });
 
         // Log to Date Night Wager History ("Love Ledger")
-        let loserLabel = 'Opponent';
-        if (curIsDateNight) {
-          loserLabel = winnerLabel === 'Yugi' ? 'Renia' : 'Yugi';
-        } else {
-          loserLabel = seriesWinner === 'local' ? curOpponentName : curPlayerName;
-        }
+        const loserLabel = winnerLabel === 'Yugi' ? 'Rania' : 'Yugi';
 
         const newHistoryItem = {
           id: Date.now().toString(),
@@ -886,7 +801,7 @@ export default function App() {
           winnerName: winnerLabel,
           loserName: loserLabel,
           finalScore: `${nextLocalScore} - ${nextOpponentScore}`,
-          wager: curActiveWager || 'Sweet Reward 💕',
+          wager: curActiveWager || '15-Min Massage 💆',
           status: 'pending'
         };
 
@@ -919,13 +834,11 @@ export default function App() {
           `${winnerDisplay} locked in 5 lines with unstoppable grace! 💕`
         ];
 
-        let roundReason = `${winnerDisplay} completed 5 lines!`;
-        if (curIsDateNight) {
-          if (winnerRole === 'tie') {
-            roundReason = tieReasons[curCurrentRound % tieReasons.length];
-          } else {
-            roundReason = roundWinQuotes[curCurrentRound % roundWinQuotes.length];
-          }
+        let roundReason = '';
+        if (winnerRole === 'tie') {
+          roundReason = tieReasons[curCurrentRound % tieReasons.length];
+        } else {
+          roundReason = roundWinQuotes[curCurrentRound % roundWinQuotes.length];
         }
 
         setRoundWinnerInfo({
@@ -942,15 +855,6 @@ export default function App() {
       }
     },
     [
-      localScore,
-      opponentScore,
-      targetWins,
-      currentRound,
-      playerName,
-      opponentName,
-      isDateNight,
-      seriesLength,
-      activeWager,
       fireVictoryConfetti
     ]
   );
@@ -962,10 +866,7 @@ export default function App() {
 
       switch (data.type) {
         case 'HELLO': {
-          setOpponentName(data.name || 'Opponent');
-          if (data.isDateNight) {
-            setIsDateNight(true);
-          }
+          setOpponentName(data.name || 'Rania');
           // Do NOT overwrite host's room wager with guest's default!
           try {
             conn.send({
@@ -973,7 +874,6 @@ export default function App() {
               name: playerNameRef.current,
               turn: 'host',
               seriesLength: seriesLengthRef.current,
-              isDateNight: isDateNightRef.current,
               wager: activeWagerRef.current
             });
           } catch (e) {
@@ -1003,7 +903,7 @@ export default function App() {
             prevBotCompletedLineIdsRef.current = [];
             setLineAlert(null);
             showToast(
-              `${data.name || 'Friend'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
+              `${data.name || 'Rania'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
             );
           }
           break;
@@ -1018,9 +918,8 @@ export default function App() {
             clearTimeout(joinTimeoutRef.current);
             joinTimeoutRef.current = null;
           }
-          setOpponentName(data.name || 'Opponent');
+          setOpponentName(data.name || 'Yugi');
           if (data.seriesLength) setSeriesLength(data.seriesLength);
-          if (typeof data.isDateNight === 'boolean') setIsDateNight(data.isDateNight);
           if (data.wager) setCustomWager(data.wager);
 
           if (screenRef.current !== 'playing') {
@@ -1045,7 +944,7 @@ export default function App() {
             prevOpponentLinesCountRef.current = 0;
             prevBotCompletedLineIdsRef.current = [];
             setLineAlert(null);
-            showToast(`Connected with ${data.name || 'Friend'}! 💕`);
+            showToast(`Connected with ${data.name || 'Yugi'}! 💕`);
           }
           break;
         }
@@ -1063,11 +962,7 @@ export default function App() {
           const newCount = data.linesCount || 0;
           if (newCount > prevOpponentLinesCountRef.current) {
             triggerHaptic([35, 50]);
-            if (isDateNightRef.current) {
-              playRomanticChime();
-            } else {
-              playLineCompleteSound();
-            }
+            playRomanticChime();
 
             const sender = data.senderName || opponentNameRef.current;
             const lineClaimedText = data.lineName ? ` ${data.lineName}` : ' a line';
@@ -1076,7 +971,7 @@ export default function App() {
                 ? `🏆 BINGO! ${sender.toUpperCase()} WON THE ROUND!`
                 : newCount === 4
                 ? `🚨 ${sender} HAS 4 LINES!`
-                : `${isDateNightRef.current ? '💕' : '✨'} ${sender} claimed${lineClaimedText}! (Opponent: ${newCount}/5)`;
+                : `💕 ${sender} claimed${lineClaimedText}! (${sender}: ${newCount}/5)`;
 
             const subtitle =
               newCount >= 5
@@ -1159,17 +1054,13 @@ export default function App() {
               !data.isClaimingWin
             ) {
               triggerHaptic([35, 50]);
-              if (isDateNightRef.current) {
-                playRomanticChime();
-              } else {
-                playLineCompleteSound();
-              }
+              playRomanticChime();
               const sender = data.senderName || opponentNameRef.current;
               const lineClaimedText = data.lineName ? ` ${data.lineName}` : ' a line';
               const title =
                 data.linesCount === 4
                   ? `🚨 ${sender} HAS 4 LINES!`
-                  : `${isDateNightRef.current ? '💕' : '✨'} ${sender} claimed${lineClaimedText}! (Opponent: ${data.linesCount}/5)`;
+                  : `💕 ${sender} claimed${lineClaimedText}! (${sender}: ${data.linesCount}/5)`;
               const subtitle =
                 data.linesCount === 4
                   ? 'ONE AWAY FROM BINGO! Watch out! 💓'
@@ -1233,7 +1124,7 @@ export default function App() {
     });
 
     conn.on('close', () => {
-      showToast('Opponent disconnected');
+      showToast(`${opponentName} disconnected`);
       setConnectionStatus('idle');
     });
 
@@ -1335,8 +1226,13 @@ export default function App() {
     setScreen('playing');
   };
 
-  // 1. Host: Create Room Flow
+  // 1. Host: Create Room Flow (Mandatory Love Ledger Wager)
   const handleCreateRoom = (retryCount = 0) => {
+    if (!customWager || !customWager.trim()) {
+      showToast('💌 Please choose a Love Ledger wager for Yugi & Rania first!');
+      return;
+    }
+
     if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
     if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
     if (connRef.current) {
@@ -1383,7 +1279,7 @@ export default function App() {
 
         conn.on('close', () => {
           if (screenRef.current === 'playing') {
-            showToast('Opponent disconnected');
+            showToast(`${opponentName} disconnected`);
             setConnectionStatus('idle');
           }
         });
@@ -1413,7 +1309,7 @@ export default function App() {
     }
   };
 
-  // 2. Guest: Join Room Flow
+  // 2. Guest: Join Room Flow (Guest is permanently Rania)
   const handleJoinRoom = (targetCode) => {
     const code = (targetCode || inputCode).trim();
     if (!/^\d{4}$/.test(code)) {
@@ -1445,7 +1341,7 @@ export default function App() {
           handshakeIntervalRef.current = null;
         }
         setConnectionStatus('error');
-        setPeerError(`Could not connect to Room ${code}. Make sure your friend has the room open.`);
+        setPeerError(`Could not connect to Room ${code}. Make sure Yugi has the room open.`);
         showToast(`Could not connect to Room ${code}`);
       }
     }, 15000);
@@ -1468,7 +1364,6 @@ export default function App() {
               conn.send({
                 type: 'HELLO',
                 name: playerNameRef.current,
-                isDateNight: isDateNightRef.current,
                 wager: activeWagerRef.current
               });
             } catch (e) {
@@ -1540,7 +1435,7 @@ export default function App() {
           joinTimeoutRef.current = null;
         }
         if (err.type === 'peer-unavailable') {
-          setPeerError(`Room ${code} not found. Please verify the code and make sure the host has the room open.`);
+          setPeerError(`Room ${code} not found. Please verify the code and make sure Yugi has the room open.`);
         } else if (err.type === 'network') {
           setPeerError('Network error connecting to matchmaking server.');
         } else {
@@ -1560,12 +1455,7 @@ export default function App() {
     if (peerRef.current) peerRef.current.destroy();
     setRole('solo');
 
-    const soloOpponentName = isDateNight
-      ? playerName === 'Renia'
-        ? 'Yugi (AI 🥂)'
-        : 'Renia (AI 💕)'
-      : 'Smart Bot (AI)';
-
+    const soloOpponentName = 'Rania (AI 💕)';
     setOpponentName(soloOpponentName);
     const emptyBoard = Array(25).fill(null);
     const freshBotBoard = generateBoard();
@@ -1607,9 +1497,7 @@ export default function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: isDateNight
-            ? 'Date Night Bingo with Yugi & Renia ❤️'
-            : 'Play 1-25 Bingo!',
+          title: 'Date Night Bingo with Yugi & Rania ❤️',
           text: `Join our Best-of-${seriesLength} Bingo match for "${activeWager}"! Code: ${roomCode}`,
           url: inviteUrl
         });
@@ -1658,7 +1546,7 @@ export default function App() {
 
   // Copy or Share Polaroid Memory Card
   const handleSharePolaroidMemory = async () => {
-    const memoryText = `📸 Yugi & Renia Date Night Bingo 🌹\n🏆 ${
+    const memoryText = `📸 Yugi & Rania Date Night Bingo 🌹\n🏆 ${
       seriesWinnerInfo?.name
     } won the Series (${seriesWinnerInfo?.finalScore})!\n📜 Official Contract: ${
       seriesWinnerInfo?.wager || activeWager
@@ -1667,7 +1555,7 @@ export default function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Yugi & Renia Date Night Victory Memory Card 📸',
+          title: 'Yugi & Rania Date Night Victory Memory Card 📸',
           text: memoryText
         });
       } catch (e) {
@@ -1732,11 +1620,7 @@ export default function App() {
       showToast('Please fill all 25 numbers before locking!');
       return;
     }
-    if (isDateNight) {
-      playRomanticChime();
-    } else {
-      playLineCompleteSound();
-    }
+    playRomanticChime();
     triggerHaptic([20, 40]);
     setIsBoardLocked(true);
     isBoardLockedRef.current = true;
@@ -1774,7 +1658,7 @@ export default function App() {
           return prevBoard;
         }
 
-        playPlacementNote(nextNum, isDateNight);
+        playPlacementNote(nextNum);
         triggerHaptic([12]);
         const next = [...prevBoard];
         next[index] = nextNum;
@@ -1791,11 +1675,9 @@ export default function App() {
     const isMyTurn = role === 'solo' ? turn === 'player' : turn === role;
     if (!isMyTurn) {
       showToast(
-        isDateNight
-          ? playerName === 'Yugi'
-            ? "Waiting for your darling Renia's move! 💕"
-            : "Waiting for your handsome Yugi's move! 🥂"
-          : "Wait for opponent's turn!"
+        playerName === 'Yugi'
+          ? "Waiting for your darling Rania's move! 💕"
+          : "Waiting for your handsome Yugi's move! 🥂"
       );
       return;
     }
@@ -1836,11 +1718,7 @@ export default function App() {
       const botLineName =
         newlyCompletedBotIds.map((id) => LINE_NAMES[id]).join(' & ') || '';
 
-      const botDisplayName = isDateNight
-        ? playerName === 'Renia'
-          ? 'Yugi (AI 🥂)'
-          : 'Renia (AI 💕)'
-        : 'Smart Bot (AI)';
+      const botDisplayName = 'Rania (AI 💕)';
 
       const playerGainedLine = localEval.completedLinesCount > prevCompletedLinesRef.current;
       const botGainedLine =
@@ -1849,7 +1727,7 @@ export default function App() {
 
       if (playerGainedLine && botGainedLine) {
         triggerHaptic([35, 50, 35]);
-        if (isDateNight) playRomanticChime(); else playLineCompleteSound();
+        playRomanticChime();
         triggerLineAlert({
           title: `⚡ DOUBLE LINE! You claimed ${localLineName} & ${botDisplayName} claimed ${botLineName}!`,
           subtitle: `Both boards progressed! You: ${localEval.completedLinesCount}/5 • Opponent: ${botEval.completedLinesCount}/5`,
@@ -1859,12 +1737,12 @@ export default function App() {
         });
       } else if (botGainedLine) {
         triggerHaptic([35, 50]);
-        if (isDateNight) playRomanticChime(); else playLineCompleteSound();
+        playRomanticChime();
         triggerLineAlert({
           title:
             botEval.completedLinesCount === 4
               ? `🚨 ${botDisplayName} HAS 4 LINES!`
-              : `${isDateNight ? '💕' : '✨'} ${botDisplayName} claimed ${botLineName}! (Opponent: ${botEval.completedLinesCount}/5)`,
+              : `💕 ${botDisplayName} claimed ${botLineName}! (${botDisplayName}: ${botEval.completedLinesCount}/5)`,
           subtitle: `${botDisplayName} just claimed ${botLineName} on their hidden board!`,
           isOpponent: true,
           count: botEval.completedLinesCount,
@@ -1926,11 +1804,7 @@ export default function App() {
       const playerEval = evaluateBoard(boardRef.current, nextCalled);
       const botEval = evaluateBoard(botBoardRef.current, nextCalled);
 
-      const botDisplayName = isDateNightRef.current
-        ? playerNameRef.current === 'Renia'
-          ? 'Yugi (AI 🥂)'
-          : 'Renia (AI 💕)'
-        : 'Smart Bot (AI)';
+      const botDisplayName = 'Rania (AI 💕)';
 
       const botGainedLine =
         botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
@@ -1953,7 +1827,7 @@ export default function App() {
 
       if (playerGainedLine && botGainedLine) {
         triggerHaptic([35, 50, 35]);
-        if (isDateNightRef.current) playRomanticChime(); else playLineCompleteSound();
+        playRomanticChime();
         triggerLineAlert({
           title: `⚡ DOUBLE LINE! You claimed ${playerLineName} & ${botDisplayName} claimed ${botLineName}!`,
           subtitle: `Both boards progressed! You: ${playerEval.completedLinesCount}/5 • Opponent: ${botEval.completedLinesCount}/5`,
@@ -1963,12 +1837,12 @@ export default function App() {
         });
       } else if (botGainedLine) {
         triggerHaptic([35, 50]);
-        if (isDateNightRef.current) playRomanticChime(); else playLineCompleteSound();
+        playRomanticChime();
         triggerLineAlert({
           title:
             botEval.completedLinesCount === 4
               ? `🚨 ${botDisplayName} HAS 4 LINES!`
-              : `${isDateNightRef.current ? '💕' : '✨'} ${botDisplayName} claimed ${botLineName}! (Opponent: ${botEval.completedLinesCount}/5)`,
+              : `💕 ${botDisplayName} claimed ${botLineName}! (${botDisplayName}: ${botEval.completedLinesCount}/5)`,
           subtitle: `${botDisplayName} just claimed ${botLineName} on their hidden board!`,
           isOpponent: true,
           count: botEval.completedLinesCount,
@@ -2075,67 +1949,66 @@ export default function App() {
     boardRef.current = emptyBoard;
   };
 
-  // Status banner text tailored for Yugi and Renia
+  // Status banner text tailored for Yugi and Rania banter
   const isLocalTurn = role === 'solo' ? turn === 'player' : turn === role;
-  let statusBannerText = isLocalTurn ? 'Your Turn' : `${opponentName}'s Turn`;
+  let statusBannerText = '';
 
-  if (isDateNight) {
-    const isYugi = playerName === 'Yugi';
+  const waitingQuotesForYugi = [
+    "Waiting for Rania’s sweet move... 💕",
+    "Take your time, my queen... admiring you. 🌹",
+    "Rania is plotting something dangerously cute... 💭",
+    "No pressure, beauty, but the crown is waiting! 👑",
+    "Listening to Rania’s adorable thinking sounds... 🎶",
+    "Contemplating love or your next number, Rania? 🥰",
+    "Rania's Turn to Strike! ⚡",
+    "Patience, king... Rania is cooking her master move! 🥂"
+  ];
 
-    const waitingQuotes = isYugi
-      ? [
-          `Waiting for Renia’s sweet move... 💕`,
-          `Take your time, beauty... admiring you. 🌹`,
-          `Renia is plotting something dangerously cute... 💭`,
-          `No pressure, my queen, but the crown is waiting! 👑`,
-          `Listening to Renia’s cute thinking sounds... 🎶`,
-          `Contemplating love or your next number, Renia? 🥰`
-        ]
-      : [
-          `Waiting for Yugi’s genius move... ✨`,
-          `Take your time, handsome... I'm watching you. 😉`,
-          `Yugi is overthinking as usual... 💭`,
-          `Show me what you've got, king! 👑`,
-          `Watching Yugi cook up his strategy... 🥂`,
-          `Contemplating love or your next number, Yugi? 🥰`
-        ];
+  const waitingQuotesForRania = [
+    "Waiting for Yugi’s genius move... ✨",
+    "Take your time, handsome... I'm watching you. 😉",
+    "Yugi is overthinking as usual... 💭",
+    "Show me what you've got, king! 👑",
+    "Watching Yugi cook up his master strategy... 🥂",
+    "Contemplating love or your next number, Yugi? 🥰",
+    "Yugi is thinking deeply... 💕",
+    "Yugi's turn to make his lady proud! 🌹"
+  ];
 
-    const turnQuotes = isYugi
-      ? [
-          'Your turn, handsome! Make it count. ❤️',
-          'Show Renia how a master plays! 🥂',
-          'The board is yours, king! 👑',
-          'Make your lady proud, Yugi! 🌹',
-          'Time to show that genius strategy! ✨',
-          'Your move, my love! ❤️'
-        ]
-      : [
-          'Your turn, gorgeous! Make it count. ❤️',
-          'The board is yours, my queen. 👑',
-          'Show Yugi who truly runs this house! 💅',
-          'Show me how a master plays, darling. 🥂',
-          'Your move, beauty! 🌹',
-          'Pick a lucky number for us both! 🍀'
-        ];
+  const turnQuotesForYugi = [
+    "Your turn, handsome! Make it count. ❤️",
+    "Show Rania how a master plays! 🥂",
+    "The board is yours, king! 👑",
+    "Make your lady proud, Yugi! 🌹",
+    "Time to show that genius strategy! ✨",
+    "Your move, my love! ❤️"
+  ];
 
-    if (isLocalTurn) {
-      statusBannerText = turnQuotes[calledNumbers.length % turnQuotes.length];
-    } else {
-      statusBannerText = waitingQuotes[calledNumbers.length % waitingQuotes.length];
-    }
+  const turnQuotesForRania = [
+    "Your turn, gorgeous! Make it count. ❤️",
+    "The board is yours, my queen. 👑",
+    "Show Yugi who truly runs this house! 💅",
+    "Show me how a master plays, darling. 🥂",
+    "Your move, beauty! 🌹",
+    "Pick a lucky number for us both! 🍀"
+  ];
+
+  const isYugi = playerName === 'Yugi';
+  if (isLocalTurn) {
+    const list = isYugi ? turnQuotesForYugi : turnQuotesForRania;
+    statusBannerText = list[calledNumbers.length % list.length];
+  } else {
+    const list = isYugi ? waitingQuotesForYugi : waitingQuotesForRania;
+    statusBannerText = list[calledNumbers.length % list.length];
   }
 
   return (
-    <div
-      className={`relative w-full min-h-screen flex flex-col justify-between overflow-x-hidden text-[#F8FAFC] transition-colors duration-500 ${
-        isDateNight ? 'date-night-mode bg-[#12030C]' : 'bg-[#090A0F]'
-      }`}
-    >
+    <div className="relative w-full min-h-screen flex flex-col justify-between overflow-x-hidden text-[#F8FAFC] date-night-mode bg-[#12030C]">
       {/* Background Ambient Glow Orbs */}
       <div className="ambient-glow-wrapper">
         <div className="glow-orb-top-left" />
         <div className="glow-orb-bottom-right" />
-        {isDateNight && <FloatingParticles />}
+        <FloatingParticles />
       </div>
 
       {/* Film Grain Texture Overlay */}
@@ -2166,76 +2039,54 @@ export default function App() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -15, scale: 0.95 }}
-            className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-wide ${
-              isDateNight
-                ? 'text-rose-100 bg-rose-950/90 shadow-rose-950/60'
-                : 'text-white'
-            }`}
+            className="fixed top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full glass-panel shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-semibold tracking-wide text-rose-100 bg-rose-950/90 shadow-rose-950/60"
           >
-            {isDateNight ? (
-              <Heart size={15} className="text-rose-400 fill-rose-400 animate-pulse" />
-            ) : (
-              <Sparkles size={15} className="text-amber-400" />
-            )}
+            <Heart size={15} className="text-rose-400 fill-rose-400 animate-pulse" />
             <span>{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ================================================================ */}
-      {/* SCREEN 1: LOBBY */}
+      {/* SCREEN 1: LOBBY (EXCLUSIVE TO YUGI & RANIA) */}
       {/* ================================================================ */}
       {screen === 'lobby' && (
         <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-4 py-4 max-w-md mx-auto overflow-y-auto space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2.5">
-              <div
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg ${
-                  isDateNight
-                    ? 'bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/30'
-                    : 'bg-gradient-to-tr from-indigo-500 to-indigo-700 shadow-indigo-500/30'
-                }`}
-              >
-                {isDateNight ? '❤️' : '25'}
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/30">
+                ❤️
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
                   BINGO{' '}
-                  <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
-                      isDateNight
-                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                        : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                    }`}
-                  >
-                    {isDateNight ? 'DATE NIGHT' : 'SERIES PRO'}
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold border bg-rose-500/20 text-rose-300 border-rose-500/30">
+                    DATE NIGHT
                   </span>
                 </h1>
-                <p className="text-xs font-semibold text-slate-400 tracking-wider">
-                  {isDateNight ? 'YUGI & RENIA EDITION' : 'ZERO-BACKEND MULTIPLAYER'}
+                <p className="text-xs font-semibold text-rose-300/80 tracking-wider">
+                  YUGI & RANIA EXCLUSIVE 🌹
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {isDateNight && (
-                <button
-                  onClick={() => {
-                    setActiveStatsTab('ledger');
-                    setShowStatsModal(true);
-                  }}
-                  className="relative w-10 h-10 rounded-full glass-button flex items-center justify-center text-rose-300 hover:text-white"
-                  title="Love Ledger & Wager Debts"
-                >
-                  <ScrollText size={18} />
-                  {pendingDebtsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-md animate-pulse">
-                      {pendingDebtsCount}
-                    </span>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setActiveStatsTab('ledger');
+                  setShowStatsModal(true);
+                }}
+                className="relative w-10 h-10 rounded-full glass-button flex items-center justify-center text-rose-300 hover:text-white"
+                title="Love Ledger & Wager Debts"
+              >
+                <ScrollText size={18} />
+                {pendingDebtsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-md animate-pulse">
+                    {pendingDebtsCount}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => {
                   setActiveStatsTab('stats');
@@ -2256,209 +2107,126 @@ export default function App() {
             </div>
           </div>
 
-          {/* Date Night Mode Toggle Pill */}
-          <div className="my-1">
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={handleToggleDateNight}
-              className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border shadow-lg ${
-                isDateNight
-                  ? 'bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-amber-950/30 border-rose-500/40 shadow-rose-950/50'
-                  : 'glass-card'
-              }`}
-            >
-              <div className="flex items-center gap-3 text-left">
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                    isDateNight ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  <Heart size={18} className={isDateNight ? 'fill-white' : ''} />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                    Date Night Mode (Yugi & Renia)
-                    {isDateNight && <span className="text-rose-400 text-xs">✨ Active</span>}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Velvet rose surfaces, champagne gold & love banter
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className={`w-11 h-6 flex items-center rounded-full p-1 duration-300 ${
-                  isDateNight ? 'bg-rose-500 justify-end' : 'bg-slate-700 justify-start'
-                }`}
-              >
-                <motion.div
-                  layout
-                  className="bg-white w-4 h-4 rounded-full shadow-md"
-                />
-              </div>
-            </motion.button>
-          </div>
-
-          {/* Date Night Persona Quick Switcher */}
-          {isDateNight && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-1 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between"
-            >
-              <span className="text-xs font-semibold text-rose-300">Choose Player:</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleSelectPersona('Yugi')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                    playerName === 'Yugi'
-                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                      : 'bg-slate-800/80 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <span>Yugi</span> 🥂
-                </button>
-                <button
-                  onClick={() => handleSelectPersona('Renia')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                    playerName === 'Renia'
-                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                      : 'bg-slate-800/80 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <span>Renia</span> 🌹
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Yugi & Renia Exclusive Lifetime Scoreboard on Main Page */}
-          {isDateNight && (
-            <GlareCard
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-2 p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
-                  <Heart size={13} className="text-rose-400 fill-rose-400" />
-                  <span>Yugi & Renia Lifetime Score</span>
+          {/* Yugi & Rania Exclusive Lifetime Scoreboard */}
+          <GlareCard
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-rose-900/50 to-amber-950/40 border border-rose-500/40 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                <Heart size={13} className="text-rose-400 fill-rose-400" />
+                <span>Lifetime Scoreboard</span>
+              </span>
+              <span className="text-xs text-amber-300 font-bold flex items-center gap-1">
+                <Flame size={13} className="text-amber-400 fill-amber-400" />
+                <span>
+                  Streak:{' '}
+                  {stats.streakHolder !== 'None'
+                    ? `${stats.streakHolder} (${stats.currentStreak || 0})`
+                    : 'None'}
                 </span>
-                <span className="text-xs text-amber-300 font-bold flex items-center gap-1">
-                  <Flame size={13} className="text-amber-400 fill-amber-400" />
-                  <span>
-                    Streak:{' '}
-                    {stats.streakHolder !== 'None'
-                      ? `${stats.streakHolder} (${stats.currentStreak || 0})`
-                      : 'None'}
-                  </span>
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-center">
-                {/* Yugi Side */}
-                <div
-                  className={`p-2.5 rounded-xl border transition ${
-                    playerName === 'Yugi'
-                      ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
-                      : 'bg-slate-900/60 border-slate-700/40'
-                  }`}
-                >
-                  <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
-                    <span>Yugi</span> 🥂
-                  </div>
-                  <div className="text-2xl font-black text-amber-400 font-display leading-none my-1">
-                    {stats.yugiSeriesWon || 0}{' '}
-                    <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
-                  </div>
-                  <div className="text-xs text-slate-300 font-medium">
-                    {stats.yugiRoundsWon || 0} Rounds Won
-                  </div>
-                </div>
-
-                {/* Renia Side */}
-                <div
-                  className={`p-2.5 rounded-xl border transition ${
-                    playerName === 'Renia'
-                      ? 'bg-rose-950/80 border-rose-400/50 shadow-inner'
-                      : 'bg-slate-900/60 border-slate-700/40'
-                  }`}
-                >
-                  <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
-                    <span>Renia</span> 🌹
-                  </div>
-                  <div className="text-2xl font-black text-rose-300 font-display leading-none my-1">
-                    {stats.reniaSeriesWon || 0}{' '}
-                    <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
-                  </div>
-                  <div className="text-xs text-slate-300 font-medium">
-                    {stats.reniaRoundsWon || 0} Rounds Won
-                  </div>
-                </div>
-              </div>
-            </GlareCard>
-          )}
-
-          {/* Date Night Wager / Stakes Selector */}
-          {isDateNight && (
-            <GlareCard
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mb-2 p-3.5 rounded-2xl glass-card space-y-2 shadow-lg"
-            >
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
-                  <Gift size={13} className="text-amber-400" />
-                  <span>Date Night Wager (Loser's Penalty)</span>
-                </label>
-                <span className="text-xs text-amber-300 font-bold">Prize at stake</span>
-              </div>
-
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  maxLength={45}
-                  value={customWager}
-                  onChange={(e) => handleWagerChange(e.target.value)}
-                  placeholder="Type wager here... (e.g. 15-min massage, cook dinner, kisses)"
-                  className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl pl-3.5 pr-8 py-2.5 text-sm font-semibold text-white placeholder-slate-400 outline-none transition shadow-inner"
-                />
-                {customWager && (
-                  <button
-                    type="button"
-                    onClick={() => handleWagerChange('')}
-                    className="absolute right-2.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition"
-                    title="Clear"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-slate-400">
-                Type any penalty or bet — winner takes all! 💕
-              </p>
-            </GlareCard>
-          )}
-
-          {/* Name Input & Best-of Selector */}
-          <div className="space-y-2.5">
-            {/* Player Name Card */}
-            <div className="glass-card p-3 space-y-1.5 rounded-2xl">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Your Player Name
-              </label>
-              <input
-                type="text"
-                maxLength={15}
-                value={playerName}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Enter name"
-                className="w-full bg-slate-900/60 border border-slate-700/60 focus:border-rose-500 rounded-xl px-3.5 py-2 text-base font-semibold text-white placeholder-slate-500 outline-none transition"
-              />
+              </span>
             </div>
 
+            <div className="grid grid-cols-2 gap-2 text-center">
+              {/* Yugi Card */}
+              <div className="p-2.5 rounded-xl border bg-rose-950/80 border-rose-400/50 shadow-inner flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white bg-gradient-to-tr from-amber-500 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.4)] border border-rose-300/40 mb-1">
+                  Y
+                </div>
+                <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
+                  <span>Yugi</span> 🥂
+                </div>
+                <div className="text-2xl font-black text-amber-400 font-display leading-none my-1">
+                  {stats.yugiSeriesWon || 0}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
+                </div>
+                <div className="text-xs text-slate-300 font-medium">
+                  {stats.yugiRoundsWon || 0} Rounds Won
+                </div>
+              </div>
+
+              {/* Rania Card */}
+              <div className="p-2.5 rounded-xl border bg-rose-950/80 border-rose-400/50 shadow-inner flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white bg-gradient-to-tr from-rose-500 to-pink-600 shadow-[0_0_10px_rgba(244,63,94,0.4)] border border-rose-300/40 mb-1">
+                  R
+                </div>
+                <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
+                  <span>Rania</span> 🌹
+                </div>
+                <div className="text-2xl font-black text-rose-300 font-display leading-none my-1">
+                  {stats.raniaSeriesWon || 0}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
+                </div>
+                <div className="text-xs text-slate-300 font-medium">
+                  {stats.raniaRoundsWon || 0} Rounds Won
+                </div>
+              </div>
+            </div>
+          </GlareCard>
+
+          {/* Mandatory Love Ledger Wager / Stakes Selector */}
+          <GlareCard
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-3.5 rounded-2xl glass-card space-y-2.5 shadow-lg border-rose-500/40"
+          >
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                <Gift size={13} className="text-amber-400" />
+                <span>Love Ledger Wager (Mandatory)</span>
+              </label>
+              <span className="text-xs text-amber-300 font-bold">Prize at stake</span>
+            </div>
+
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                maxLength={45}
+                value={customWager}
+                onChange={(e) => handleWagerChange(e.target.value)}
+                placeholder="Choose or enter wager... (e.g. 15-Min Massage 💆)"
+                className="w-full bg-slate-900/75 border border-rose-500/40 focus:border-rose-400 rounded-xl pl-3.5 pr-8 py-2.5 text-sm font-semibold text-white placeholder-slate-400 outline-none transition shadow-inner"
+              />
+              {customWager && (
+                <button
+                  type="button"
+                  onClick={() => handleWagerChange('')}
+                  className="absolute right-2.5 w-5 h-5 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition"
+                  title="Clear"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {/* Quick 1-Tap Preset Wager Chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {WAGER_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    handleWagerChange(preset);
+                    triggerHaptic([10]);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs transition border ${
+                    customWager === preset
+                      ? 'bg-rose-500/30 border-rose-400 text-rose-200 font-bold shadow-sm'
+                      : 'bg-slate-900/60 border-slate-700/50 text-slate-300 hover:text-white hover:border-rose-500/40'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </GlareCard>
+
+          {/* Series Length & Room Actions */}
+          <div className="space-y-2.5">
             {/* Best-of Series Selector */}
-            <div className="glass-card p-3 space-y-2 rounded-2xl">
+            <div className="glass-card p-3 space-y-2 rounded-2xl border-rose-500/30">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Swords size={13} className="text-amber-400" />
@@ -2487,9 +2255,7 @@ export default function App() {
                       }}
                       className={`py-2 px-1 rounded-xl text-center transition flex flex-col items-center justify-center border ${
                         isSelected
-                          ? isDateNight
-                            ? 'bg-rose-500 border-rose-300 text-white font-extrabold shadow-md shadow-rose-500/30'
-                            : 'bg-indigo-600 border-indigo-300 text-white font-extrabold shadow-md shadow-indigo-500/30'
+                          ? 'bg-rose-500 border-rose-300 text-white font-extrabold shadow-md shadow-rose-500/30'
                           : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:text-white'
                       }`}
                     >
@@ -2506,11 +2272,7 @@ export default function App() {
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className={`p-3.5 rounded-2xl border shadow-xl flex flex-col gap-2.5 ${
-                  isDateNight
-                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/70 to-amber-950/60 border-rose-400/50 shadow-rose-950/60'
-                    : 'bg-gradient-to-r from-indigo-950/90 via-indigo-900/70 to-purple-950/60 border-indigo-400/50 shadow-indigo-950/60'
-                }`}
+                className="p-3.5 rounded-2xl border shadow-xl flex flex-col gap-2.5 bg-gradient-to-r from-rose-950/90 via-rose-900/70 to-amber-950/60 border-rose-400/50 shadow-rose-950/60"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -2526,44 +2288,36 @@ export default function App() {
                 <RippleButton
                   onClick={() => handleJoinRoom(inputCode)}
                   disabled={connectionStatus === 'connecting'}
-                  className={`w-full py-3.5 rounded-xl text-white font-black text-base flex items-center justify-center gap-2 shadow-lg border border-white/20 transition ${
-                    isDateNight
-                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/40'
-                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/40'
-                  }`}
+                  className="w-full py-3.5 rounded-xl text-white font-black text-base flex items-center justify-center gap-2 shadow-lg border border-white/20 transition bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/40"
                 >
                   <Users size={20} />
                   <span>
                     {connectionStatus === 'connecting'
-                      ? 'Connecting to Room...'
-                      : `Join Room #${inputCode} Now`}
+                      ? 'Connecting as Rania...'
+                      : `Join Room #${inputCode} as Rania 🌹`}
                   </span>
                 </RippleButton>
               </motion.div>
             )}
 
-            {/* Create Room Button */}
+            {/* Create Room Button (Host is Yugi) */}
             <RippleButton
               onClick={handleCreateRoom}
-              className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
-                isDateNight
-                  ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/25 border-rose-400/30'
-                  : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 shadow-indigo-500/25 border-indigo-400/30'
-              }`}
+              className="w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/25 border-rose-400/30"
             >
               <Users size={20} />
-              <span>Create 2-Player Room (Best of {seriesLength})</span>
+              <span>Create Room as Yugi 🥂 (Best of {seriesLength})</span>
             </RippleButton>
 
-            {/* Join Room Box */}
+            {/* Join Room Box (Guest is Rania) */}
             <div
               className={`glass-card p-3 space-y-2 rounded-2xl transition-all ${
-                isUrlJoin ? 'ring-2 ring-indigo-500/80 bg-indigo-950/20' : ''
+                isUrlJoin ? 'ring-2 ring-rose-500/80 bg-rose-950/20' : ''
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                  {isUrlJoin ? "Friend's Invite Link Ready" : "Join Friend's Room"}
+                  {isUrlJoin ? "Yugi's Invite Link Ready" : "Join Yugi's Room as Rania 🌹"}
                 </span>
                 {isUrlJoin && (
                   <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
@@ -2588,9 +2342,9 @@ export default function App() {
                 <RippleButton
                   onClick={() => handleJoinRoom()}
                   disabled={connectionStatus === 'connecting' || inputCode.length !== 4}
-                  className="px-5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold text-sm border border-slate-600/50 transition flex items-center justify-center shrink-0"
+                  className="px-5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-sm border border-rose-400/40 transition flex items-center justify-center shrink-0 shadow-md shadow-rose-950/40"
                 >
-                  {connectionStatus === 'connecting' ? 'Joining...' : 'Join'}
+                  {connectionStatus === 'connecting' ? 'Joining...' : 'Join as Rania'}
                 </RippleButton>
               </div>
 
@@ -2616,12 +2370,8 @@ export default function App() {
               onClick={handlePlaySolo}
               className="w-full py-3 rounded-2xl glass-button text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-slate-800/80"
             >
-              <Bot size={18} className={isDateNight ? 'text-rose-400' : 'text-emerald-400'} />
-              <span>
-                {isDateNight
-                  ? `Solo Practice vs ${playerName === 'Renia' ? 'Yugi AI 🥂' : 'Renia AI 💕'}`
-                  : `Play Solo vs Smart Bot (Best of ${seriesLength})`}
-              </span>
+              <Bot size={18} className="text-rose-400" />
+              <span>Solo Practice vs Rania AI 💕 (Best of {seriesLength})</span>
             </motion.button>
           </div>
 
@@ -2633,9 +2383,7 @@ export default function App() {
             >
               <Flame size={14} className="text-amber-400" />
               <span>
-                {isDateNight
-                  ? `Yugi: ${stats.yugiSeriesWon || 0}W • Renia: ${stats.reniaSeriesWon || 0}W • Streak: 🔥 ${stats.currentStreak || 0}`
-                  : `Lifetime Series: ${stats.localSeriesWon}W - ${stats.opponentSeriesWon}L • Streak: 🔥 ${stats.currentStreak}`}
+                Yugi: {stats.yugiSeriesWon || 0}W • Rania: {stats.raniaSeriesWon || 0}W • Streak: 🔥 {stats.currentStreak || 0}
               </span>
             </button>
           </div>
@@ -2643,7 +2391,7 @@ export default function App() {
       )}
 
       {/* ================================================================ */}
-      {/* SCREEN 2: WAITING ROOM (HOST) */}
+      {/* SCREEN 2: WAITING ROOM (HOST: YUGI) */}
       {/* ================================================================ */}
       {screen === 'waiting' && (
         <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-5 py-6 max-w-md mx-auto">
@@ -2656,11 +2404,7 @@ export default function App() {
               <ArrowLeft size={16} />
               <span>Cancel</span>
             </button>
-            <span
-              className={`text-sm font-bold tracking-wider ${
-                isDateNight ? 'text-rose-400' : 'text-indigo-400'
-              }`}
-            >
+            <span className="text-sm font-bold tracking-wider text-rose-400">
               BEST OF {seriesLength}
             </span>
           </div>
@@ -2670,31 +2414,19 @@ export default function App() {
             <div className="space-y-2">
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
                 <span>Room Created!</span>
-                {isDateNight && <span>❤️</span>}
+                <span>❤️</span>
               </h2>
               <p className="text-sm text-slate-300 max-w-xs mx-auto">
-                {isDateNight
-                  ? `Playing for: "${activeWager}" 💕 Share this code with your sweetheart!`
-                  : 'Share this 4-digit code or link with your friend to connect and play.'}
+                Playing for: "{activeWager}" 💕 Share this code with Rania!
               </p>
             </div>
 
             {/* Giant Room Code Display */}
-            <div
-              className={`glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden shadow-2xl ${
-                isDateNight
-                  ? 'shadow-rose-950/50'
-                  : 'shadow-indigo-950/50'
-              }`}
-            >
+            <div className="glass-card py-6 px-4 max-w-xs mx-auto relative overflow-hidden shadow-2xl shadow-rose-950/50 border-rose-500/40">
               <div className="text-xs uppercase font-bold text-slate-400 tracking-widest mb-1.5">
                 Room Code
               </div>
-              <div
-                className={`text-5xl sm:text-6xl font-black tracking-widest font-display ${
-                  isDateNight ? 'text-rose-300' : 'text-indigo-300'
-                }`}
-              >
+              <div className="text-5xl sm:text-6xl font-black tracking-widest font-display text-rose-300">
                 {roomCode}
               </div>
             </div>
@@ -2704,14 +2436,10 @@ export default function App() {
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={handleShareInvite}
-                className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
-                  isDateNight
-                    ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/20 border-rose-400/30'
-                    : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 shadow-emerald-500/20 border-emerald-400/30'
-                }`}
+                className="w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/20 border-rose-400/30"
               >
                 <Share2 size={20} />
-                <span>Share Invite Link</span>
+                <span>Share Invite Link with Rania</span>
               </motion.button>
 
               <button
@@ -2753,22 +2481,10 @@ export default function App() {
               ) : (
                 <>
                   <span className="relative flex h-2.5 w-2.5">
-                    <span
-                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                        isDateNight ? 'bg-rose-400' : 'bg-emerald-400'
-                      }`}
-                    />
-                    <span
-                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                        isDateNight ? 'bg-rose-500' : 'bg-emerald-500'
-                      }`}
-                    />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-rose-400" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
                   </span>
-                  <span>
-                    {isDateNight
-                      ? 'Room is live! Waiting for darling to connect...'
-                      : 'Room is live! Waiting for opponent to connect...'}
-                  </span>
+                  <span>Room is live! Waiting for Rania to connect...</span>
                 </>
               )}
             </div>
@@ -2818,71 +2534,53 @@ export default function App() {
           <div
             className={`w-full py-2 px-3 rounded-2xl flex items-center justify-between border shadow-md my-0.5 transition-all duration-300 ${
               isOpponentThreat
-                ? isDateNight
-                  ? 'bg-rose-950/60 border-rose-500/70 shadow-[0_0_18px_rgba(244,63,94,0.35)]'
-                  : 'bg-slate-900/80 border-rose-500/60 shadow-[0_0_18px_rgba(239,68,68,0.3)]'
-                : isDateNight
-                ? 'bg-rose-950/40 border-rose-500/30'
-                : 'bg-slate-900/60 border-slate-700/50'
+                ? 'bg-rose-950/60 border-rose-500/70 shadow-[0_0_18px_rgba(244,63,94,0.35)]'
+                : 'bg-rose-950/40 border-rose-500/30'
             }`}
           >
             {/* Player 1 (Local) */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              {isDateNight ? (
-                <Heart size={16} className="text-rose-400 fill-rose-400 shrink-0" />
-              ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
-              )}
+              <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white bg-gradient-to-tr from-amber-500 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-rose-300/40 shrink-0">
+                {playerName === 'Yugi' ? 'Y' : 'R'}
+              </div>
               <div className="min-w-0 flex-1 max-w-[95px] sm:max-w-[125px]">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs sm:text-sm text-white truncate block">
                     {playerName}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-semibold font-mono ml-1 shrink-0">
+                  <span className="text-[10px] text-rose-300/90 font-semibold font-mono ml-1 shrink-0">
                     {completedLinesCount}/5
                   </span>
                 </div>
                 {/* Player 1 Sleek Progress Bar */}
                 <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
                   <motion.div
-                    className={`h-full rounded-full ${
-                      isDateNight
-                        ? 'bg-gradient-to-r from-rose-500 to-amber-400'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-400'
-                    }`}
+                    className="h-full rounded-full bg-gradient-to-r from-rose-500 to-amber-400"
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min(100, (completedLinesCount / 5) * 100)}%` }}
                     transition={{ duration: 0.45, ease: 'easeOut' }}
                   />
                 </div>
               </div>
-              <span
-                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
-                  isDateNight ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'
-                }`}
-              >
+              <span className="text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display bg-rose-500/20 text-rose-300">
                 {localScore}
               </span>
             </div>
 
-            <div className="text-[11px] font-black uppercase text-slate-500 tracking-wider px-1.5">
+            <div className="text-[11px] font-black uppercase text-rose-400/60 tracking-wider px-1.5">
               VS
             </div>
 
             {/* Player 2 (Opponent) */}
             <div className="flex items-center gap-2 min-w-0 justify-end flex-1">
-              <span
-                className={`text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display ${
-                  isDateNight ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-200'
-                }`}
-              >
+              <span className="text-sm sm:text-base font-black px-2 py-0.5 rounded-lg shrink-0 font-display bg-amber-500/20 text-amber-300">
                 {opponentScore}
               </span>
               <div className="text-right min-w-0 flex-1 max-w-[95px] sm:max-w-[125px]">
                 <div className="flex items-center justify-between">
                   <span
                     className={`text-[10px] font-semibold font-mono mr-1 shrink-0 ${
-                      isOpponentThreat ? 'text-amber-300 font-black' : 'text-slate-400'
+                      isOpponentThreat ? 'text-amber-300 font-black' : 'text-rose-300/90'
                     }`}
                   >
                     {opponentLinesCount}/5
@@ -2907,9 +2605,7 @@ export default function App() {
                     className={`h-full rounded-full ${
                       isOpponentThreat
                         ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-600 shadow-[0_0_8px_rgba(239,68,68,0.9)]'
-                        : isDateNight
-                        ? 'bg-gradient-to-r from-amber-400 to-rose-400'
-                        : 'bg-gradient-to-r from-indigo-400 to-purple-500'
+                        : 'bg-gradient-to-r from-amber-400 to-rose-400'
                     }`}
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min(100, (opponentLinesCount / 5) * 100)}%` }}
@@ -2918,53 +2614,16 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Opponent Avatar with Imminent Threat Pulse */}
-              {isDateNight ? (
-                <motion.div
-                  animate={
-                    isOpponentThreat
-                      ? {
-                          scale: [1, 1.25, 1],
-                          filter: [
-                            'drop-shadow(0 0 3px rgba(244,63,94,0.6))',
-                            'drop-shadow(0 0 12px rgba(244,63,94,1))',
-                            'drop-shadow(0 0 3px rgba(244,63,94,0.6))'
-                          ]
-                        }
-                      : {}
-                  }
-                  transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
-                  className="shrink-0"
-                >
-                  <Heart
-                    size={16}
-                    className={
-                      isOpponentThreat
-                        ? 'text-rose-400 fill-rose-500'
-                        : 'text-amber-400 fill-amber-400'
-                    }
-                  />
-                </motion.div>
-              ) : (
-                <motion.span
-                  animate={
-                    isOpponentThreat
-                      ? {
-                          scale: [1, 1.3, 1],
-                          boxShadow: [
-                            '0 0 4px rgba(239,68,68,0.6)',
-                            '0 0 16px rgba(239,68,68,1)',
-                            '0 0 4px rgba(239,68,68,0.6)'
-                          ]
-                        }
-                      : {}
-                  }
-                  transition={{ repeat: Infinity, duration: 1.1, ease: 'easeInOut' }}
-                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    isOpponentThreat ? 'bg-red-500' : 'bg-indigo-400'
-                  }`}
-                />
-              )}
+              {/* Opponent Avatar */}
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white shrink-0 shadow-md ${
+                  opponentName.includes('Rania') || opponentName.includes('Renia')
+                    ? 'bg-gradient-to-tr from-rose-500 to-pink-600 shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-rose-300/40'
+                    : 'bg-gradient-to-tr from-amber-500 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.5)] border border-rose-300/40'
+                }`}
+              >
+                {opponentName.includes('Rania') || opponentName.includes('Renia') ? 'R' : 'Y'}
+              </div>
             </div>
           </div>
 
@@ -2977,9 +2636,7 @@ export default function App() {
                 !isBoardLocked
                   ? 'bg-slate-800/80 text-amber-300 border-amber-500/30'
                   : isLocalTurn
-                  ? isDateNight
-                    ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-rose-950/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-500/20'
+                  ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 shadow-rose-950/40'
                   : 'bg-slate-800/60 text-slate-300 border-slate-700/40'
               }`}
             >
@@ -2988,10 +2645,8 @@ export default function App() {
                   !isBoardLocked
                     ? 'bg-amber-400 animate-pulse'
                     : isLocalTurn
-                    ? isDateNight
-                      ? 'bg-rose-400 animate-pulse'
-                      : 'bg-emerald-400 animate-pulse'
-                    : 'bg-indigo-400'
+                    ? 'bg-rose-400 animate-pulse'
+                    : 'bg-rose-400/60'
                 }`}
               />
               <span className="truncate">
@@ -3087,7 +2742,7 @@ export default function App() {
                         }`}
                         style={{ transformStyle: 'preserve-3d' }}
                       >
-                        {/* Themed Dauber Stamp (Physical Pressed Glass) */}
+                        {/* Themed Dauber Stamp (Physical Pressed Heart Glass) */}
                         {isCalled && (
                           <motion.div
                             initial={{ scale: 3, opacity: 0, rotate: -15 }}
@@ -3095,21 +2750,12 @@ export default function App() {
                             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
                           >
-                            {isDateNight ? (
-                              <svg
-                                viewBox="0 0 24 24"
-                                className="w-8 h-8 sm:w-10 sm:h-10 text-rose-400/40 fill-current drop-shadow-[0_0_10px_rgba(244,63,94,0.75)]"
-                              >
-                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                              </svg>
-                            ) : (
-                              <svg
-                                viewBox="0 0 24 24"
-                                className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-300/35 fill-current drop-shadow-[0_0_10px_rgba(129,140,248,0.75)]"
-                              >
-                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                              </svg>
-                            )}
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="w-8 h-8 sm:w-10 sm:h-10 text-rose-400/40 fill-current drop-shadow-[0_0_10px_rgba(244,63,94,0.75)]"
+                            >
+                              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                            </svg>
                           </motion.div>
                         )}
 
@@ -3126,7 +2772,6 @@ export default function App() {
                     <MeteorRay
                       key={meteor.id}
                       lineId={meteor.lineId}
-                      isDateNight={isDateNight}
                       onComplete={() => {
                         setActiveMeteors((prev) => prev.filter((m) => m.id !== meteor.id));
                       }}
@@ -3137,8 +2782,8 @@ export default function App() {
             </motion.div>
           </div>
 
-          {/* In-Game Floating Reactions Emote Bar (Date Night Multiplayer Only) */}
-          {isDateNight && isBoardLocked && role !== 'solo' && (
+          {/* In-Game Floating Reactions Emote Bar (Multiplayer Only) */}
+          {isBoardLocked && role !== 'solo' && (
             <div className="flex items-center justify-center gap-2 py-0.5">
               <span className="text-xs font-bold text-rose-300 opacity-80">Send Love:</span>
               <div className="flex items-center gap-1.5 p-1 rounded-full glass-panel shadow-md">
@@ -3158,7 +2803,7 @@ export default function App() {
 
           {/* Setup Control Panel / In-game Call Status */}
           {!isBoardLocked ? (
-            <div className="w-full max-w-sm mx-auto p-3.5 rounded-2xl glass-card shadow-xl space-y-2.5 my-1">
+            <div className="w-full max-w-sm mx-auto p-3.5 rounded-2xl glass-card shadow-xl space-y-2.5 my-1 border-rose-500/30">
               {/* Header Status Row */}
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
@@ -3169,13 +2814,7 @@ export default function App() {
                 </div>
 
                 {nextSequentialNumber !== null ? (
-                  <div
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                      isDateNight
-                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                        : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                    }`}
-                  >
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-rose-500/20 text-rose-300 border-rose-500/40">
                     <span>Next on tap:</span>
                     <motion.span
                       layoutId={`tile-${nextSequentialNumber}`}
@@ -3186,7 +2825,7 @@ export default function App() {
                     </motion.span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
                     <Check size={14} />
                     <span>Board Complete!</span>
                   </div>
@@ -3198,14 +2837,10 @@ export default function App() {
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleFillRandom}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow ${
-                    isDateNight
-                      ? 'bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                  }`}
+                  className="py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border-rose-500/40"
                   title="Fill remaining or all slots randomly"
                 >
-                  <Shuffle size={14} className={isDateNight ? 'text-rose-400' : 'text-indigo-400'} />
+                  <Shuffle size={14} className="text-rose-400" />
                   <span>Random 🎲</span>
                 </motion.button>
 
@@ -3225,11 +2860,7 @@ export default function App() {
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleLockBoard}
-                  className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 border transition ${
-                    isDateNight
-                      ? 'bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/50 animate-pulse'
-                      : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 border-emerald-400/40 shadow-emerald-950/50 animate-pulse'
-                  }`}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 border transition bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white border-amber-300/40 shadow-rose-900/50 animate-pulse"
                 >
                   <Lock size={16} />
                   <span>Lock Board & Ready! 🎯</span>
@@ -3243,8 +2874,8 @@ export default function App() {
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[36px] my-1">
               {calledNumbers.length === 0 ? (
-                <div className="flex items-center gap-2 py-1 px-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-md">
-                  <Lock size={13} className="text-emerald-400" />
+                <div className="flex items-center gap-2 py-1 px-4 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold shadow-md">
+                  <Lock size={13} className="text-rose-400" />
                   <span>
                     Board Locked!{' '}
                     {isLocalTurn ? 'Your turn to call a number!' : `Waiting for ${opponentName}...`}
@@ -3258,7 +2889,7 @@ export default function App() {
                   {lastCalled && (
                     <div className="flex items-center gap-2.5">
                       <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Last Call:</span>
-                      <HeroOrb key={lastCalled} number={lastCalled} isDateNight={isDateNight} />
+                      <HeroOrb key={lastCalled} number={lastCalled} />
                     </div>
                   )}
                 </div>
@@ -3282,30 +2913,16 @@ export default function App() {
                   className={`bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl rounded-full px-6 py-2 flex items-center gap-2.5 sm:gap-3 text-white pointer-events-auto ${
                     lineAlert.count >= 4
                       ? 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.35)]'
-                      : lineAlert.isOpponent
-                      ? isDateNight
-                        ? 'border-rose-400/40 shadow-[0_0_18px_rgba(244,63,94,0.3)]'
-                        : 'border-indigo-400/40 shadow-[0_0_18px_rgba(129,140,248,0.3)]'
-                      : isDateNight
-                      ? 'border-rose-400/40 shadow-[0_0_18px_rgba(244,63,94,0.3)]'
-                      : 'border-emerald-400/40 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
+                      : 'border-rose-400/40 shadow-[0_0_18px_rgba(244,63,94,0.3)]'
                   }`}
                 >
                   <span className="text-base shrink-0">
-                    {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
+                    {lineAlert.count >= 4 ? '🔥' : '💕'}
                   </span>
                   <div className="text-xs sm:text-sm font-bold truncate max-w-[190px] sm:max-w-[240px]">
                     {lineAlert.title.replace(/\s*\(Opponent: \d+\/5\)/, '')}
                   </div>
-                  <div
-                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ml-1 ${
-                      lineAlert.isOpponent
-                        ? 'bg-indigo-900/70 text-indigo-200 border-indigo-400/40'
-                        : isDateNight
-                        ? 'bg-rose-900/70 text-amber-200 border-amber-400/50'
-                        : 'bg-emerald-900/70 text-emerald-200 border-emerald-400/40'
-                    }`}
-                  >
+                  <div className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ml-1 bg-rose-900/70 text-amber-200 border-amber-400/50">
                     {lineAlert.count}/5 lines
                   </div>
                 </div>
@@ -3330,20 +2947,10 @@ export default function App() {
               initial={{ scale: 0.88, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.88, y: 15 }}
-              className="glass-card w-full max-w-sm p-5 text-center space-y-4 shadow-2xl"
+              className="glass-card w-full max-w-sm p-5 text-center space-y-4 shadow-2xl border-rose-500/40"
             >
-              <div
-                className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white shadow-xl ${
-                  isDateNight
-                    ? 'bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/40'
-                    : 'bg-gradient-to-tr from-amber-400 to-amber-600 shadow-amber-500/30 text-slate-950'
-                }`}
-              >
-                {isDateNight ? (
-                  <Heart size={36} className="fill-white" />
-                ) : (
-                  <Award size={36} strokeWidth={2.2} />
-                )}
+              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-white shadow-xl bg-gradient-to-tr from-rose-500 to-rose-700 shadow-rose-500/40">
+                <Heart size={36} className="fill-white" />
               </div>
 
               <div className="space-y-1.5">
@@ -3380,16 +2987,12 @@ export default function App() {
               {role === 'guest' ? (
                 <div className="w-full py-3.5 px-4 rounded-2xl text-slate-300 font-bold text-sm bg-slate-800/80 border border-slate-700/60 flex items-center justify-center gap-2 cursor-not-allowed">
                   <RefreshCw size={16} className="animate-spin text-slate-400" />
-                  <span>Waiting for Host to start next round...</span>
+                  <span>Waiting for Yugi to start next round...</span>
                 </div>
               ) : (
                 <RippleButton
                   onClick={handleProceedToNextRound}
-                  className={`w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
-                    isDateNight
-                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30'
-                      : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/30 border-indigo-400/30'
-                  }`}
+                  className="w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/30 border-rose-400/30"
                 >
                   <RefreshCw size={18} />
                   <span>Start Round {roundWinnerInfo.roundNum + 1}</span>
@@ -3415,27 +3018,19 @@ export default function App() {
               initial={{ scale: 0.85, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.85, y: 20 }}
-              className={`glass-card w-full max-w-sm p-6 text-center space-y-4 shadow-2xl ${
-                isDateNight ? 'shadow-rose-950/60' : 'shadow-amber-950/50'
-              }`}
+              className="glass-card w-full max-w-sm p-6 text-center space-y-4 shadow-2xl shadow-rose-950/60 border-rose-500/40"
             >
               {/* Grand Trophy Icon */}
-              <div
-                className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center shadow-xl ${
-                  isDateNight
-                    ? 'bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 text-white shadow-rose-500/40'
-                    : 'bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 shadow-amber-500/40'
-                }`}
-              >
+              <div className="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center shadow-xl bg-gradient-to-tr from-rose-500 via-rose-600 to-amber-500 text-white shadow-rose-500/40">
                 <Trophy size={42} strokeWidth={2.3} />
               </div>
 
               {/* Title */}
               <div className="space-y-1.5">
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400 flex items-center justify-center gap-1.5">
-                  <Star size={13} className="fill-amber-400" />
+                  <Sparkles size={13} className="text-amber-400" />
                   <span>SERIES CHAMPION</span>
-                  <Star size={13} className="fill-amber-400" />
+                  <Sparkles size={13} className="text-amber-400" />
                 </span>
                 <SplitText
                   text={`${seriesWinnerInfo.name} WINS THE SERIES!`}
@@ -3454,66 +3049,56 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Official Date Night Contract Awarded */}
-              {isDateNight && (
-                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/70 via-rose-950/70 to-amber-950/70 border border-amber-400/50 text-center space-y-1 shadow-lg">
-                  <div className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center justify-center gap-1.5">
-                    <Sparkles size={13} className="text-amber-400" />
-                    <span>Official Date Night Contract Sealed</span>
-                    <Sparkles size={13} className="text-amber-400" />
-                  </div>
-                  <div className="text-sm font-bold text-white">
-                    {seriesWinnerInfo.name} wins:{' '}
-                    <span className="shimmer-text font-black">
-                      {seriesWinnerInfo.wager || activeWager}
-                    </span>
-                  </div>
+              {/* Official Love Ledger Contract Awarded */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/70 via-rose-950/70 to-amber-950/70 border border-amber-400/50 text-center space-y-1 shadow-lg">
+                <div className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center justify-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>Official Love Ledger Contract Sealed</span>
+                  <Sparkles size={13} className="text-amber-400" />
                 </div>
-              )}
+                <div className="text-sm font-bold text-white">
+                  {seriesWinnerInfo.name} wins:{' '}
+                  <span className="shimmer-text font-black">
+                    {seriesWinnerInfo.wager || activeWager}
+                  </span>
+                </div>
+              </div>
 
               {/* Action Buttons */}
               <div className="space-y-2.5 pt-1">
-                {isDateNight && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setShowPolaroidModal(true)}
-                      className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-1.5 hover:bg-rose-950/40 shadow-md"
-                    >
-                      <Camera size={15} />
-                      <span>Polaroid 📸</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveStatsTab('ledger');
-                        setShowStatsModal(true);
-                      }}
-                      className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-amber-300 border-amber-400/40 flex items-center justify-center gap-1.5 hover:bg-amber-950/40 shadow-md"
-                    >
-                      <ScrollText size={15} />
-                      <span>Love Ledger 📜</span>
-                    </button>
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setShowPolaroidModal(true)}
+                    className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-rose-300 border-rose-400/40 flex items-center justify-center gap-1.5 hover:bg-rose-950/40 shadow-md"
+                  >
+                    <Camera size={15} />
+                    <span>Polaroid 📸</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveStatsTab('ledger');
+                      setShowStatsModal(true);
+                    }}
+                    className="py-2.5 px-2 rounded-xl glass-button text-xs font-bold text-amber-300 border-amber-400/40 flex items-center justify-center gap-1.5 hover:bg-amber-950/40 shadow-md"
+                  >
+                    <ScrollText size={15} />
+                    <span>Love Ledger 📜</span>
+                  </button>
+                </div>
 
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSeriesRematch}
                   disabled={rematchStatus === 'requested'}
-                  className={`w-full py-4 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border ${
-                    isDateNight
-                      ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/25 border-rose-400/30'
-                      : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 shadow-indigo-500/25 border-indigo-400/30'
-                  }`}
+                  className="w-full py-4 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 shadow-rose-500/25 border-rose-400/30"
                 >
                   <RefreshCw size={18} />
                   <span>
                     {rematchStatus === 'requested'
-                      ? 'Waiting for Opponent...'
+                      ? 'Waiting for Partner...'
                       : rematchStatus === 'received'
                       ? 'Accept Rematch!'
-                      : isDateNight
-                      ? 'Play Another Series, Honey? 💕'
-                      : 'Play Another Series'}
+                      : 'Play Another Series, Honey? 💕'}
                   </span>
                 </motion.button>
 
@@ -3544,7 +3129,7 @@ export default function App() {
               initial={{ scale: 0.9, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 15 }}
-              className="glass-card w-full max-w-sm p-4 sm:p-5 space-y-3.5 shadow-2xl max-h-[88vh] flex flex-col"
+              className="glass-card w-full max-w-sm p-4 sm:p-5 space-y-3.5 shadow-2xl max-h-[88vh] flex flex-col border-rose-500/40"
             >
               <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
@@ -3554,11 +3139,9 @@ export default function App() {
                     <Flame size={22} className="text-amber-400" />
                   )}
                   <h3 className="text-lg font-black text-white">
-                    {isDateNight
-                      ? activeStatsTab === 'ledger'
-                        ? 'The Love Ledger 📜'
-                        : 'Yugi vs Renia Rivalry'
-                      : 'Head-to-Head Stats'}
+                    {activeStatsTab === 'ledger'
+                      ? 'The Love Ledger 📜'
+                      : 'Yugi vs Rania Rivalry 💕'}
                   </h3>
                 </div>
                 <button
@@ -3569,38 +3152,36 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Tabs for Date Night: Stats vs Love Ledger */}
-              {isDateNight && (
-                <div className="flex rounded-xl bg-slate-900/80 p-1 border border-rose-500/30 shrink-0">
-                  <button
-                    onClick={() => setActiveStatsTab('stats')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      activeStatsTab === 'stats'
-                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Flame size={14} />
-                    <span>Rivalry Stats</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveStatsTab('ledger')}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      activeStatsTab === 'ledger'
-                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <ScrollText size={14} />
-                    <span>Love Ledger</span>
-                    {pendingDebtsCount > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center ml-0.5">
-                        {pendingDebtsCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
+              {/* Tabs for Stats vs Love Ledger */}
+              <div className="flex rounded-xl bg-slate-900/80 p-1 border border-rose-500/30 shrink-0">
+                <button
+                  onClick={() => setActiveStatsTab('stats')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    activeStatsTab === 'stats'
+                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Flame size={14} />
+                  <span>Rivalry Stats</span>
+                </button>
+                <button
+                  onClick={() => setActiveStatsTab('ledger')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    activeStatsTab === 'ledger'
+                      ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ScrollText size={14} />
+                  <span>Love Ledger</span>
+                  {pendingDebtsCount > 0 && (
+                    <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center ml-0.5">
+                      {pendingDebtsCount}
+                    </span>
+                  )}
+                </button>
+              </div>
 
               {/* Tab 1: Rivalry Stats Content */}
               {activeStatsTab === 'stats' ? (
@@ -3612,15 +3193,13 @@ export default function App() {
                     </span>
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-bold text-white text-sm">
-                        {isDateNight ? 'Yugi 🥂' : playerName}
+                        Yugi 🥂
                       </span>
                       <span className="text-lg font-black text-amber-400 font-display">
-                        {isDateNight
-                          ? `${stats.yugiSeriesWon || 0} - ${stats.reniaSeriesWon || 0}`
-                          : `${stats.localSeriesWon} - ${stats.opponentSeriesWon}`}
+                        {stats.yugiSeriesWon || 0} - {stats.raniaSeriesWon || 0}
                       </span>
                       <span className="font-bold text-slate-300 text-sm">
-                        {isDateNight ? 'Renia 🌹' : opponentName}
+                        Rania 🌹
                       </span>
                     </div>
                   </GlareCard>
@@ -3629,18 +3208,18 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-2 text-center text-xs">
                     <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60">
                       <span className="text-xs uppercase font-bold text-slate-400 block">
-                        {isDateNight ? 'Yugi Rounds' : 'Your Rounds Won'}
+                        Yugi Rounds
                       </span>
                       <span className="text-lg font-extrabold text-white font-display">
-                        {isDateNight ? stats.yugiRoundsWon || 0 : stats.localRoundsWon}
+                        {stats.yugiRoundsWon || 0}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60">
                       <span className="text-xs uppercase font-bold text-slate-400 block">
-                        {isDateNight ? 'Renia Rounds' : 'Opponent Rounds'}
+                        Rania Rounds
                       </span>
-                      <span className="text-lg font-extrabold text-slate-300 font-display">
-                        {isDateNight ? stats.reniaRoundsWon || 0 : stats.opponentRoundsWon}
+                      <span className="text-lg font-extrabold text-rose-300 font-display">
+                        {stats.raniaRoundsWon || 0}
                       </span>
                     </div>
                   </div>
@@ -3683,9 +3262,9 @@ export default function App() {
                     </div>
                     <div className="w-[1px] h-8 bg-rose-500/30" />
                     <div>
-                      <span className="text-xs font-bold text-slate-300 block">Renia Owes</span>
+                      <span className="text-xs font-bold text-slate-300 block">Rania Owes</span>
                       <span className="text-lg font-black text-rose-300 font-mono">
-                        {reniaOwesCount} {reniaOwesCount === 1 ? 'Debt' : 'Debts'}
+                        {raniaOwesCount} {raniaOwesCount === 1 ? 'Debt' : 'Debts'}
                       </span>
                     </div>
                   </div>
@@ -3696,7 +3275,7 @@ export default function App() {
                       <Heart size={32} className="mx-auto text-rose-400/60" />
                       <p className="text-sm font-semibold text-slate-200">No debts recorded yet!</p>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Play a Date Night series to crown a champion and log what the loser has to do 💕
+                        Play a series to crown a champion and log what the loser has to do 💕
                       </p>
                     </div>
                   ) : (
@@ -3796,7 +3375,7 @@ export default function App() {
               {/* Polaroid Photo Frame */}
               <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-tr from-rose-950 via-rose-900 to-amber-950 p-4 flex flex-col justify-between items-center text-center relative overflow-hidden border border-rose-500/40 shadow-inner">
                 <div className="w-full flex items-center justify-between text-[10px] font-bold text-rose-300/80 uppercase tracking-widest">
-                  <span>Yugi & Renia</span>
+                  <span>Yugi & Rania</span>
                   <span>Date Night</span>
                 </div>
 

@@ -144,19 +144,19 @@ export function playLineCompleteSound() {
 /**
  * playSweepSound: Gentle sweeping harmonic shimmer for Domino Wave & Meteor Ray
  */
-export function playSweepSound(isDateNight = false) {
+export function playSweepSound() {
   if (isMuted) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
 
-    // Harmonic 1 (Base shimmer glissando: 440Hz -> 880Hz or 523Hz -> 1046Hz)
+    // Harmonic 1 (Base shimmer glissando: 523Hz -> 1046Hz, C5 to C6)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
-    const startFreq = isDateNight ? 523.25 : 440; // C5 or A4
-    const endFreq = isDateNight ? 1046.50 : 880;  // C6 or A5
+    const startFreq = 523.25; // C5
+    const endFreq = 1046.50;  // C6
     osc1.frequency.setValueAtTime(startFreq, now);
     osc1.frequency.exponentialRampToValueAtTime(endFreq, now + 0.45);
 
@@ -206,7 +206,7 @@ export function playWinFanfare() {
 
     const startTime = ctx.currentTime + 0.02;
 
-    notes.forEach((note, idx) => {
+    notes.forEach((note) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const noteTime = startTime + note.time;
@@ -280,7 +280,7 @@ export function playRomanticChime() {
 
     const startTime = ctx.currentTime + 0.02;
 
-    notes.forEach((note, idx) => {
+    notes.forEach((note) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const noteTime = startTime + note.time;
@@ -307,7 +307,7 @@ export function playRomanticChime() {
  * 7. playPlacementNote: Ascending pentatonic note when placing numbers 1 to 25
  * Makes sequential board filling sound like a cheerful kalimba / music box
  */
-export function playPlacementNote(number = 1, isDateNight = false) {
+export function playPlacementNote(number = 1) {
   if (isMuted) return;
   try {
     const ctx = getAudioContext();
@@ -328,13 +328,13 @@ export function playPlacementNote(number = 1, isDateNight = false) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    osc.type = isDateNight ? 'sine' : 'triangle';
+    osc.type = 'sine';
     const now = ctx.currentTime;
 
     osc.frequency.setValueAtTime(freq, now);
 
-    const dur = isDateNight ? 0.22 : 0.16;
-    gain.gain.setValueAtTime(isDateNight ? 0.24 : 0.26, now);
+    const dur = 0.22;
+    gain.gain.setValueAtTime(0.24, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
     osc.connect(gain);
