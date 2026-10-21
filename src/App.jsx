@@ -2969,7 +2969,7 @@ export default function App() {
           </div>
 
           {/* Dedicated Centered Turn Status Banner */}
-          <div className="flex items-center justify-center w-full my-0.5">
+          <div className="flex items-center justify-center w-full h-12 mt-1 mb-3">
             <motion.div
               animate={isLocalTurn ? { scale: [1, 1.02, 1] } : {}}
               transition={{ repeat: Infinity, duration: 2.2 }}
@@ -3003,7 +3003,7 @@ export default function App() {
           </div>
 
           {/* B-I-N-G-O Header Badges */}
-          <div className="grid grid-cols-5 gap-2 w-full max-w-[380px] mx-auto place-items-center">
+          <div className="grid grid-cols-5 gap-2 w-full max-w-[380px] mx-auto place-items-center mb-5">
             {BINGO_LETTERS.map((letter, index) => {
               const isActive = completedLinesCount > index;
               return (
@@ -3251,7 +3251,7 @@ export default function App() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-4 text-xs sm:text-sm font-semibold text-slate-400 py-1">
+                <div className="flex items-center justify-center gap-6 h-20 text-xs sm:text-sm font-semibold text-slate-400">
                   <span className="flex items-center gap-1.5">
                     Calls: <strong className="text-white font-mono text-sm">{calledNumbers.length}</strong>/25
                   </span>
