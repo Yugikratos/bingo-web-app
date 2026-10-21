@@ -3002,49 +3002,6 @@ export default function App() {
             </motion.div>
           </div>
 
-          {/* Prominent Line Completion Alert Banner (Compact & Sleek) */}
-          <AnimatePresence>
-            {lineAlert && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -6 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -6 }}
-                transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                className={`w-full py-1.5 px-3 rounded-xl flex items-center justify-between shadow-xl border my-0.5 ${
-                  lineAlert.count >= 4
-                    ? 'bg-gradient-to-r from-amber-950/95 via-rose-950/95 to-red-950/90 border-amber-400/70 text-amber-100 ring-1 ring-amber-400/50'
-                    : lineAlert.isOpponent
-                    ? isDateNight
-                      ? 'bg-gradient-to-r from-amber-950/90 via-rose-950/90 to-amber-900/80 border-amber-400/60 text-amber-100'
-                      : 'bg-indigo-950/90 border-indigo-400/50 text-indigo-100'
-                    : isDateNight
-                    ? 'bg-gradient-to-r from-rose-950/90 via-rose-900/90 to-pink-950/90 border-rose-400/60 text-rose-100'
-                    : 'bg-emerald-950/90 border-emerald-400/50 text-emerald-100'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">
-                    {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
-                  </span>
-                  <div className="text-xs font-bold leading-tight truncate">
-                    {lineAlert.title.replace(/\s*\(Opponent: \d+\/5\)/, '')}
-                  </div>
-                </div>
-                <div
-                  className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ml-2 ${
-                    lineAlert.isOpponent
-                      ? 'bg-indigo-900/60 text-indigo-200 border-indigo-400/40'
-                      : isDateNight
-                      ? 'bg-rose-900/70 text-amber-200 border-amber-400/50'
-                      : 'bg-emerald-900/60 text-emerald-200 border-emerald-400/40'
-                  }`}
-                >
-                  {lineAlert.count}/5 lines
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* B-I-N-G-O Header Badges */}
           <div className="grid grid-cols-5 gap-2 w-full max-w-[380px] mx-auto place-items-center">
             {BINGO_LETTERS.map((letter, index) => {
@@ -3309,6 +3266,52 @@ export default function App() {
             </div>
           )}
           </LayoutGroup>
+
+          {/* Bottom-Anchored Line Completion Alert Banner (Floats just above Hero Orb) */}
+          <AnimatePresence>
+            {lineAlert && (
+              <motion.div
+                key="bottom-line-alert"
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none w-max max-w-[92%]"
+              >
+                <div
+                  className={`bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl rounded-full px-6 py-2 flex items-center gap-2.5 sm:gap-3 text-white pointer-events-auto ${
+                    lineAlert.count >= 4
+                      ? 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.35)]'
+                      : lineAlert.isOpponent
+                      ? isDateNight
+                        ? 'border-rose-400/40 shadow-[0_0_18px_rgba(244,63,94,0.3)]'
+                        : 'border-indigo-400/40 shadow-[0_0_18px_rgba(129,140,248,0.3)]'
+                      : isDateNight
+                      ? 'border-rose-400/40 shadow-[0_0_18px_rgba(244,63,94,0.3)]'
+                      : 'border-emerald-400/40 shadow-[0_0_18px_rgba(16,185,129,0.3)]'
+                  }`}
+                >
+                  <span className="text-base shrink-0">
+                    {lineAlert.count >= 4 ? '🔥' : isDateNight ? '💕' : '✨'}
+                  </span>
+                  <div className="text-xs sm:text-sm font-bold truncate max-w-[190px] sm:max-w-[240px]">
+                    {lineAlert.title.replace(/\s*\(Opponent: \d+\/5\)/, '')}
+                  </div>
+                  <div
+                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ml-1 ${
+                      lineAlert.isOpponent
+                        ? 'bg-indigo-900/70 text-indigo-200 border-indigo-400/40'
+                        : isDateNight
+                        ? 'bg-rose-900/70 text-amber-200 border-amber-400/50'
+                        : 'bg-emerald-900/70 text-emerald-200 border-emerald-400/40'
+                    }`}
+                  >
+                    {lineAlert.count}/5 lines
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
