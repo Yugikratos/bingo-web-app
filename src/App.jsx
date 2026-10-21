@@ -3276,7 +3276,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none w-max max-w-[92%]"
+                className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pointer-events-none w-max max-w-[92%]"
               >
                 <div
                   className={`bg-black/60 backdrop-blur-md border border-white/10 shadow-2xl rounded-full px-6 py-2 flex items-center gap-2.5 sm:gap-3 text-white pointer-events-auto ${
