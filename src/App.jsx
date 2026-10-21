@@ -155,10 +155,10 @@ function FloatingParticles() {
 const DEFAULT_STATS = {
   totalSeriesPlayed: 0,
   yugiSeriesWon: 0,
-  raniaSeriesWon: 0,
+  reniaSeriesWon: 0,
   totalRoundsPlayed: 0,
   yugiRoundsWon: 0,
-  raniaRoundsWon: 0,
+  reniaRoundsWon: 0,
   currentStreak: 0,
   streakHolder: 'None'
 };
@@ -191,7 +191,7 @@ export default function App() {
   const [opponentScore, setOpponentScore] = useState(0);
 
   // Multiplayer Connection State
-  const [role, setRole] = useState('host'); // 'host' (Yugi) | 'guest' (Rania) | 'solo' (Yugi vs Rania AI)
+  const [role, setRole] = useState('host'); // 'host' (Yugi) | 'guest' (Renia) | 'solo' (Yugi vs Renia AI)
   const [roomCode, setRoomCode] = useState('');
   const [inputCode, setInputCode] = useState('');
   const [isUrlJoin, setIsUrlJoin] = useState(false);
@@ -199,9 +199,9 @@ export default function App() {
   const [peerError, setPeerError] = useState('');
 
   // Exclusive Hardcoded Identities (Task 1):
-  // Host is always "Yugi", Guest is always "Rania"
-  const playerName = role === 'guest' ? 'Rania' : 'Yugi';
-  const opponentName = role === 'guest' ? 'Yugi' : 'Rania';
+  // Host is always "Yugi", Guest is always "Renia"
+  const playerName = role === 'guest' ? 'Renia' : 'Yugi';
+  const opponentName = role === 'guest' ? 'Yugi' : 'Renia';
 
   // Audio mute state
   const [isMuted, setIsMuted] = useState(getSoundMuted());
@@ -240,7 +240,7 @@ export default function App() {
   const gridContainerRef = useRef(null);
   const shakeControls = useAnimation();
 
-  // Persistent Head-to-Head Stats (Yugi & Rania Exclusive)
+  // Persistent Head-to-Head Stats (Yugi & Renia Exclusive)
   const [stats, setStats] = useState(() => {
     try {
       const saved = localStorage.getItem('bingo_h2h_stats_v2');
@@ -249,9 +249,9 @@ export default function App() {
         return {
           ...DEFAULT_STATS,
           ...parsed,
-          raniaSeriesWon: parsed.raniaSeriesWon ?? parsed.reniaSeriesWon ?? 0,
-          raniaRoundsWon: parsed.raniaRoundsWon ?? parsed.reniaRoundsWon ?? 0,
-          streakHolder: parsed.streakHolder === 'Renia' ? 'Rania' : (parsed.streakHolder || 'None')
+          reniaSeriesWon: parsed.reniaSeriesWon ?? parsed.raniaSeriesWon ?? 0,
+          reniaRoundsWon: parsed.reniaRoundsWon ?? parsed.raniaRoundsWon ?? 0,
+          streakHolder: parsed.streakHolder === 'Rania' ? 'Renia' : (parsed.streakHolder || 'None')
         };
       }
       return DEFAULT_STATS;
@@ -343,7 +343,7 @@ export default function App() {
   const pendingDebts = wagerHistory.filter((item) => item.status === 'pending');
   const pendingDebtsCount = pendingDebts.length;
   const yugiOwesCount = pendingDebts.filter((item) => item.loserName === 'Yugi').length;
-  const raniaOwesCount = pendingDebts.filter((item) => item.loserName === 'Rania' || item.loserName === 'Renia').length;
+  const reniaOwesCount = pendingDebts.filter((item) => item.loserName === 'Renia' || item.loserName === 'Rania').length;
 
   // Handle Wager Text Change
   const handleWagerChange = (val) => {
@@ -468,7 +468,7 @@ export default function App() {
     showToast(nextMuted ? 'Sound Muted' : 'Sound Enabled');
   };
 
-  // Inspect URL for auto-join room code on mount (Task 1: Guest is permanently Rania)
+  // Inspect URL for auto-join room code on mount (Task 1: Guest is permanently Renia)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -476,7 +476,7 @@ export default function App() {
       if (urlRoom && /^\d{4}$/.test(urlRoom)) {
         setInputCode(urlRoom);
         setIsUrlJoin(true);
-        setRole('guest'); // Guest is permanently Rania
+        setRole('guest'); // Guest is permanently Renia
       }
     } catch (e) {}
   }, []);
@@ -682,19 +682,22 @@ export default function App() {
       const curCurrentRound = currentRoundRef.current;
       const curTargetWins = getTargetWins(curSeriesLength);
 
-      // Identify winner by name for lifetime Yugi vs Rania tally
+      // Identify winner by name for lifetime Yugi vs Renia tally
       const winnerIsYugi =
         winnerDisplay.includes('Yugi') ||
         (winnerRole === 'local' && curPlayerName === 'Yugi') ||
         (winnerRole === 'opponent' && curOpponentName.includes('Yugi'));
-      const winnerIsRania =
-        winnerDisplay.includes('Rania') ||
+      const winnerIsRenia =
         winnerDisplay.includes('Renia') ||
-        (winnerRole === 'local' && (curPlayerName === 'Rania' || curPlayerName === 'Renia')) ||
-        (winnerRole === 'opponent' && (curOpponentName.includes('Rania') || curOpponentName.includes('Renia')));
+        winnerDisplay.includes('Rania') ||
+        (winnerRole === 'local' && (curPlayerName === 'Renia' || curPlayerName === 'Rania')) ||
+        (winnerRole === 'opponent' && (curOpponentName.includes('Renia') || curOpponentName.includes('Rania')));
 
       // Update rounds in persistent stats
       setStats((prev) => {
+        const nextReniaRounds = winnerIsRenia
+          ? (prev.reniaRoundsWon ?? prev.raniaRoundsWon ?? 0) + 1
+          : (prev.reniaRoundsWon ?? prev.raniaRoundsWon ?? 0);
         const updated = {
           ...prev,
           totalRoundsPlayed: (prev.totalRoundsPlayed || 0) + 1,
@@ -709,9 +712,8 @@ export default function App() {
           yugiRoundsWon: winnerIsYugi
             ? (prev.yugiRoundsWon || 0) + 1
             : prev.yugiRoundsWon || 0,
-          raniaRoundsWon: winnerIsRania
-            ? (prev.raniaRoundsWon || 0) + 1
-            : prev.raniaRoundsWon || 0
+          reniaRoundsWon: nextReniaRounds,
+          raniaRoundsWon: nextReniaRounds
         };
         try {
           localStorage.setItem('bingo_h2h_stats_v2', JSON.stringify(updated));
@@ -749,13 +751,13 @@ export default function App() {
           reason: romanticSeriesReason
         });
 
-        // Determine if Yugi or Rania clinched the series for named stats
+        // Determine if Yugi or Renia clinched the series for named stats
         const seriesWinnerIsYugi = seriesWinnerName.includes('Yugi');
-        const seriesWinnerIsRania = seriesWinnerName.includes('Rania') || seriesWinnerName.includes('Renia');
+        const seriesWinnerIsRenia = seriesWinnerName.includes('Renia') || seriesWinnerName.includes('Rania');
         const winnerLabel = seriesWinnerIsYugi
           ? 'Yugi'
-          : seriesWinnerIsRania
-          ? 'Rania'
+          : seriesWinnerIsRenia
+          ? 'Renia'
           : seriesWinner;
 
         // Update series in persistent stats
@@ -763,6 +765,9 @@ export default function App() {
           const isWinnerLocal = seriesWinner === 'local';
           const newStreak =
             prev.streakHolder === winnerLabel ? (prev.currentStreak || 0) + 1 : 1;
+          const nextReniaSeries = seriesWinnerIsRenia
+            ? (prev.reniaSeriesWon ?? prev.raniaSeriesWon ?? 0) + 1
+            : (prev.reniaSeriesWon ?? prev.raniaSeriesWon ?? 0);
           const updated = {
             ...prev,
             totalSeriesPlayed: (prev.totalSeriesPlayed || 0) + 1,
@@ -775,9 +780,8 @@ export default function App() {
             yugiSeriesWon: seriesWinnerIsYugi
               ? (prev.yugiSeriesWon || 0) + 1
               : prev.yugiSeriesWon || 0,
-            raniaSeriesWon: seriesWinnerIsRania
-              ? (prev.raniaSeriesWon || 0) + 1
-              : prev.raniaSeriesWon || 0,
+            reniaSeriesWon: nextReniaSeries,
+            raniaSeriesWon: nextReniaSeries,
             currentStreak: newStreak,
             streakHolder: winnerLabel
           };
@@ -788,7 +792,7 @@ export default function App() {
         });
 
         // Log to Date Night Wager History ("Love Ledger")
-        const loserLabel = winnerLabel === 'Yugi' ? 'Rania' : 'Yugi';
+        const loserLabel = winnerLabel === 'Yugi' ? 'Renia' : 'Yugi';
 
         const newHistoryItem = {
           id: Date.now().toString(),
@@ -866,7 +870,7 @@ export default function App() {
 
       switch (data.type) {
         case 'HELLO': {
-          setOpponentName(data.name || 'Rania');
+          setOpponentName(data.name || 'Renia');
           // Do NOT overwrite host's room wager with guest's default!
           try {
             conn.send({
@@ -903,7 +907,7 @@ export default function App() {
             prevBotCompletedLineIdsRef.current = [];
             setLineAlert(null);
             showToast(
-              `${data.name || 'Rania'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
+              `${data.name || 'Renia'} joined! Best of ${seriesLengthRef.current} for ${activeWagerRef.current}`
             );
           }
           break;
@@ -1229,7 +1233,7 @@ export default function App() {
   // 1. Host: Create Room Flow (Mandatory Love Ledger Wager)
   const handleCreateRoom = (retryCount = 0) => {
     if (!customWager || !customWager.trim()) {
-      showToast('💌 Please choose a Love Ledger wager for Yugi & Rania first!');
+      showToast('💌 Please choose a Love Ledger wager for Yugi & Renia first!');
       return;
     }
 
@@ -1309,7 +1313,7 @@ export default function App() {
     }
   };
 
-  // 2. Guest: Join Room Flow (Guest is permanently Rania)
+  // 2. Guest: Join Room Flow (Guest is permanently Renia)
   const handleJoinRoom = (targetCode) => {
     const code = (targetCode || inputCode).trim();
     if (!/^\d{4}$/.test(code)) {
@@ -1455,7 +1459,7 @@ export default function App() {
     if (peerRef.current) peerRef.current.destroy();
     setRole('solo');
 
-    const soloOpponentName = 'Rania (AI 💕)';
+    const soloOpponentName = 'Renia (AI 💕)';
     setOpponentName(soloOpponentName);
     const emptyBoard = Array(25).fill(null);
     const freshBotBoard = generateBoard();
@@ -1497,7 +1501,7 @@ export default function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Date Night Bingo with Yugi & Rania ❤️',
+          title: 'Date Night Bingo with Yugi & Renia ❤️',
           text: `Join our Best-of-${seriesLength} Bingo match for "${activeWager}"! Code: ${roomCode}`,
           url: inviteUrl
         });
@@ -1546,7 +1550,7 @@ export default function App() {
 
   // Copy or Share Polaroid Memory Card
   const handleSharePolaroidMemory = async () => {
-    const memoryText = `📸 Yugi & Rania Date Night Bingo 🌹\n🏆 ${
+    const memoryText = `📸 Yugi & Renia Date Night Bingo 🌹\n🏆 ${
       seriesWinnerInfo?.name
     } won the Series (${seriesWinnerInfo?.finalScore})!\n📜 Official Contract: ${
       seriesWinnerInfo?.wager || activeWager
@@ -1555,7 +1559,7 @@ export default function App() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Yugi & Rania Date Night Victory Memory Card 📸',
+          title: 'Yugi & Renia Date Night Victory Memory Card 📸',
           text: memoryText
         });
       } catch (e) {
@@ -1676,7 +1680,7 @@ export default function App() {
     if (!isMyTurn) {
       showToast(
         playerName === 'Yugi'
-          ? "Waiting for your darling Rania's move! 💕"
+          ? "Waiting for your darling Renia's move! 💕"
           : "Waiting for your handsome Yugi's move! 🥂"
       );
       return;
@@ -1718,7 +1722,7 @@ export default function App() {
       const botLineName =
         newlyCompletedBotIds.map((id) => LINE_NAMES[id]).join(' & ') || '';
 
-      const botDisplayName = 'Rania (AI 💕)';
+      const botDisplayName = 'Renia (AI 💕)';
 
       const playerGainedLine = localEval.completedLinesCount > prevCompletedLinesRef.current;
       const botGainedLine =
@@ -1804,7 +1808,7 @@ export default function App() {
       const playerEval = evaluateBoard(boardRef.current, nextCalled);
       const botEval = evaluateBoard(botBoardRef.current, nextCalled);
 
-      const botDisplayName = 'Rania (AI 💕)';
+      const botDisplayName = 'Renia (AI 💕)';
 
       const botGainedLine =
         botEval.completedLinesCount > prevOpponentLinesCountRef.current &&
@@ -1949,22 +1953,22 @@ export default function App() {
     boardRef.current = emptyBoard;
   };
 
-  // Status banner text tailored for Yugi and Rania banter
+  // Status banner text tailored for Yugi and Renia banter
   const isLocalTurn = role === 'solo' ? turn === 'player' : turn === role;
   let statusBannerText = '';
 
   const waitingQuotesForYugi = [
-    "Waiting for Rania’s sweet move... 💕",
+    "Waiting for Renia’s sweet move... 💕",
     "Take your time, my queen... admiring you. 🌹",
-    "Rania is plotting something dangerously cute... 💭",
+    "Renia is plotting something dangerously cute... 💭",
     "No pressure, beauty, but the crown is waiting! 👑",
-    "Listening to Rania’s adorable thinking sounds... 🎶",
-    "Contemplating love or your next number, Rania? 🥰",
-    "Rania's Turn to Strike! ⚡",
-    "Patience, king... Rania is cooking her master move! 🥂"
+    "Listening to Renia’s adorable thinking sounds... 🎶",
+    "Contemplating love or your next number, Renia? 🥰",
+    "Renia's Turn to Strike! ⚡",
+    "Patience, king... Renia is cooking her master move! 🥂"
   ];
 
-  const waitingQuotesForRania = [
+  const waitingQuotesForRenia = [
     "Waiting for Yugi’s genius move... ✨",
     "Take your time, handsome... I'm watching you. 😉",
     "Yugi is overthinking as usual... 💭",
@@ -1977,14 +1981,14 @@ export default function App() {
 
   const turnQuotesForYugi = [
     "Your turn, handsome! Make it count. ❤️",
-    "Show Rania how a master plays! 🥂",
+    "Show Renia how a master plays! 🥂",
     "The board is yours, king! 👑",
     "Make your lady proud, Yugi! 🌹",
     "Time to show that genius strategy! ✨",
     "Your move, my love! ❤️"
   ];
 
-  const turnQuotesForRania = [
+  const turnQuotesForRenia = [
     "Your turn, gorgeous! Make it count. ❤️",
     "The board is yours, my queen. 👑",
     "Show Yugi who truly runs this house! 💅",
@@ -1995,10 +1999,10 @@ export default function App() {
 
   const isYugi = playerName === 'Yugi';
   if (isLocalTurn) {
-    const list = isYugi ? turnQuotesForYugi : turnQuotesForRania;
+    const list = isYugi ? turnQuotesForYugi : turnQuotesForRenia;
     statusBannerText = list[calledNumbers.length % list.length];
   } else {
-    const list = isYugi ? waitingQuotesForYugi : waitingQuotesForRania;
+    const list = isYugi ? waitingQuotesForYugi : waitingQuotesForRenia;
     statusBannerText = list[calledNumbers.length % list.length];
   }
 
@@ -2048,7 +2052,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ================================================================ */}
-      {/* SCREEN 1: LOBBY (EXCLUSIVE TO YUGI & RANIA) */}
+      {/* SCREEN 1: LOBBY (EXCLUSIVE TO YUGI & RENIA) */}
       {/* ================================================================ */}
       {screen === 'lobby' && (
         <div className="relative z-10 w-full min-h-[100dvh] flex flex-col justify-between px-4 py-4 max-w-md mx-auto overflow-y-auto space-y-3">
@@ -2066,7 +2070,7 @@ export default function App() {
                   </span>
                 </h1>
                 <p className="text-xs font-semibold text-rose-300/80 tracking-wider">
-                  YUGI & RANIA EXCLUSIVE 🌹
+                  YUGI & RENIA EXCLUSIVE 🌹
                 </p>
               </div>
             </div>
@@ -2107,7 +2111,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Yugi & Rania Exclusive Lifetime Scoreboard */}
+          {/* Yugi & Renia Exclusive Lifetime Scoreboard */}
           <GlareCard
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -2147,20 +2151,20 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Rania Card */}
+              {/* Renia Card */}
               <div className="p-2.5 rounded-xl border bg-rose-950/80 border-rose-400/50 shadow-inner flex flex-col items-center">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white bg-gradient-to-tr from-rose-500 to-pink-600 shadow-[0_0_10px_rgba(244,63,94,0.4)] border border-rose-300/40 mb-1">
                   R
                 </div>
                 <div className="text-sm font-bold text-white flex items-center justify-center gap-1">
-                  <span>Rania</span> 🌹
+                  <span>Renia</span> 🌹
                 </div>
                 <div className="text-2xl font-black text-rose-300 font-display leading-none my-1">
-                  {stats.raniaSeriesWon || 0}{' '}
+                  {stats.reniaSeriesWon || stats.raniaSeriesWon || 0}{' '}
                   <span className="text-xs text-slate-400 font-sans font-bold">Series</span>
                 </div>
                 <div className="text-xs text-slate-300 font-medium">
-                  {stats.raniaRoundsWon || 0} Rounds Won
+                  {stats.reniaRoundsWon || stats.raniaRoundsWon || 0} Rounds Won
                 </div>
               </div>
             </div>
@@ -2293,8 +2297,8 @@ export default function App() {
                   <Users size={20} />
                   <span>
                     {connectionStatus === 'connecting'
-                      ? 'Connecting as Rania...'
-                      : `Join Room #${inputCode} as Rania 🌹`}
+                      ? 'Connecting as Renia...'
+                      : `Join Room #${inputCode} as Renia 🌹`}
                   </span>
                 </RippleButton>
               </motion.div>
@@ -2309,7 +2313,7 @@ export default function App() {
               <span>Create Room as Yugi 🥂 (Best of {seriesLength})</span>
             </RippleButton>
 
-            {/* Join Room Box (Guest is Rania) */}
+            {/* Join Room Box (Guest is Renia) */}
             <div
               className={`glass-card p-3 space-y-2 rounded-2xl transition-all ${
                 isUrlJoin ? 'ring-2 ring-rose-500/80 bg-rose-950/20' : ''
@@ -2317,7 +2321,7 @@ export default function App() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                  {isUrlJoin ? "Yugi's Invite Link Ready" : "Join Yugi's Room as Rania 🌹"}
+                  {isUrlJoin ? "Yugi's Invite Link Ready" : "Join Yugi's Room as Renia 🌹"}
                 </span>
                 {isUrlJoin && (
                   <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
@@ -2344,7 +2348,7 @@ export default function App() {
                   disabled={connectionStatus === 'connecting' || inputCode.length !== 4}
                   className="px-5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-sm border border-rose-400/40 transition flex items-center justify-center shrink-0 shadow-md shadow-rose-950/40"
                 >
-                  {connectionStatus === 'connecting' ? 'Joining...' : 'Join as Rania'}
+                  {connectionStatus === 'connecting' ? 'Joining...' : 'Join as Renia'}
                 </RippleButton>
               </div>
 
@@ -2371,7 +2375,7 @@ export default function App() {
               className="w-full py-3 rounded-2xl glass-button text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-slate-800/80"
             >
               <Bot size={18} className="text-rose-400" />
-              <span>Solo Practice vs Rania AI 💕 (Best of {seriesLength})</span>
+              <span>Solo Practice vs Renia AI 💕 (Best of {seriesLength})</span>
             </motion.button>
           </div>
 
@@ -2383,7 +2387,7 @@ export default function App() {
             >
               <Flame size={14} className="text-amber-400" />
               <span>
-                Yugi: {stats.yugiSeriesWon || 0}W • Rania: {stats.raniaSeriesWon || 0}W • Streak: 🔥 {stats.currentStreak || 0}
+                Yugi: {stats.yugiSeriesWon || 0}W • Renia: {stats.reniaSeriesWon || stats.raniaSeriesWon || 0}W • Streak: 🔥 {stats.currentStreak || 0}
               </span>
             </button>
           </div>
@@ -2417,7 +2421,7 @@ export default function App() {
                 <span>❤️</span>
               </h2>
               <p className="text-sm text-slate-300 max-w-xs mx-auto">
-                Playing for: "{activeWager}" 💕 Share this code with Rania!
+                Playing for: "{activeWager}" 💕 Share this code with Renia!
               </p>
             </div>
 
@@ -2439,7 +2443,7 @@ export default function App() {
                 className="w-full py-3.5 rounded-2xl text-white font-bold text-base shadow-lg flex items-center justify-center gap-2 border bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-rose-500/20 border-rose-400/30"
               >
                 <Share2 size={20} />
-                <span>Share Invite Link with Rania</span>
+                <span>Share Invite Link with Renia</span>
               </motion.button>
 
               <button
@@ -2484,7 +2488,7 @@ export default function App() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-rose-400" />
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
                   </span>
-                  <span>Room is live! Waiting for Rania to connect...</span>
+                  <span>Room is live! Waiting for Renia to connect...</span>
                 </>
               )}
             </div>
@@ -3141,7 +3145,7 @@ export default function App() {
                   <h3 className="text-lg font-black text-white">
                     {activeStatsTab === 'ledger'
                       ? 'The Love Ledger 📜'
-                      : 'Yugi vs Rania Rivalry 💕'}
+                      : 'Yugi vs Renia Rivalry 💕'}
                   </h3>
                 </div>
                 <button
@@ -3196,10 +3200,10 @@ export default function App() {
                         Yugi 🥂
                       </span>
                       <span className="text-lg font-black text-amber-400 font-display">
-                        {stats.yugiSeriesWon || 0} - {stats.raniaSeriesWon || 0}
+                        {stats.yugiSeriesWon || 0} - {stats.reniaSeriesWon || stats.raniaSeriesWon || 0}
                       </span>
                       <span className="font-bold text-slate-300 text-sm">
-                        Rania 🌹
+                        Renia 🌹
                       </span>
                     </div>
                   </GlareCard>
@@ -3216,10 +3220,10 @@ export default function App() {
                     </div>
                     <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60">
                       <span className="text-xs uppercase font-bold text-slate-400 block">
-                        Rania Rounds
+                        Renia Rounds
                       </span>
                       <span className="text-lg font-extrabold text-rose-300 font-display">
-                        {stats.raniaRoundsWon || 0}
+                        {stats.reniaRoundsWon || stats.raniaRoundsWon || 0}
                       </span>
                     </div>
                   </div>
@@ -3262,9 +3266,9 @@ export default function App() {
                     </div>
                     <div className="w-[1px] h-8 bg-rose-500/30" />
                     <div>
-                      <span className="text-xs font-bold text-slate-300 block">Rania Owes</span>
+                      <span className="text-xs font-bold text-slate-300 block">Renia Owes</span>
                       <span className="text-lg font-black text-rose-300 font-mono">
-                        {raniaOwesCount} {raniaOwesCount === 1 ? 'Debt' : 'Debts'}
+                        {reniaOwesCount} {reniaOwesCount === 1 ? 'Debt' : 'Debts'}
                       </span>
                     </div>
                   </div>
@@ -3375,7 +3379,7 @@ export default function App() {
               {/* Polaroid Photo Frame */}
               <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-tr from-rose-950 via-rose-900 to-amber-950 p-4 flex flex-col justify-between items-center text-center relative overflow-hidden border border-rose-500/40 shadow-inner">
                 <div className="w-full flex items-center justify-between text-[10px] font-bold text-rose-300/80 uppercase tracking-widest">
-                  <span>Yugi & Rania</span>
+                  <span>Yugi & Renia</span>
                   <span>Date Night</span>
                 </div>
 

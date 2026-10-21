@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 /**
  * Hero Number Orb (Floating 3D Puck)
  * Renders the most recently called number as a high-impact, tactile 3D sphere with spring physics.
- * Permanently styled in Yugi & Rania Champagne Gold and Velvet Rose.
+ * Permanently styled in Yugi & Renia Champagne Gold and Velvet Rose.
  */
 export default function HeroOrb({ number }) {
   if (number === null || number === undefined) return null;
